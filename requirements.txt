@@ -1,0 +1,1 @@
+pillow  # opcional: redimensiona imágenes y dibuja el título en el icono
