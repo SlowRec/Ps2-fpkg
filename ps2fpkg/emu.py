@@ -58,37 +58,80 @@ def collect(base):
     return files
 
 
+EXECUTABLE_EXT = (".bin", ".self", ".sprx", ".prx")
+
+# Perfiles de calidad: opciones de config-emu-ps4.txt.
+#   --gs-uprender: resolución interna (none = nativa de PS2, 2x2 = doble en cada eje, lo máximo del emulador).
+#   --gs-upscale:  filtro al escalar a la salida (edgesmooth suaviza bordes; point/bilinear/gpu/none).
+#   --host-audio:  salida de audio del emulador activada.
+QUALITY_PROFILES = {
+    "maxima": ["--gs-uprender=2x2", "--gs-upscale=edgesmooth", "--host-audio=1"],
+    "rendimiento": ["--gs-uprender=none", "--gs-upscale=edgesmooth", "--host-audio=1"],
+    "original": [],
+}
+
+
 def warnings(base):
     out = []
     if not os.path.isfile(os.path.join(base, "ps2-emu-compiler.self")):
         out.append("La base no tiene ps2-emu-compiler.self; puede que no sea un emulador de PS2 Classics.")
     if not os.path.isfile(os.path.join(base, CONFIG_NAME)):
         out.append(f"La base no tiene {CONFIG_NAME}; se creará uno mínimo.")
+    unsigned = unsigned_executables(base)
+    if unsigned:
+        out.append("Estos ejecutables son ELF sin firmar (no fSELF) y la PS4 podría no abrirlos: "
+                   + ", ".join(unsigned) + ". Fírmalos con make_fself o usa una base extraída de un fPKG.")
     return out
 
 
-def _split(line):
-    """'--clave=valor' -> ('--clave', 'valor'); '--clave' -> ('--clave', None)."""
-    key, sep, value = line.partition("=")
-    return key.strip(), (value.strip() if sep else None)
+def unsigned_executables(base):
+    """Ejecutables que son ELF planos (descifrados pero sin la firma falsa fSELF)."""
+    found = []
+    for rel in collect(base):
+        if rel.lower().endswith(EXECUTABLE_EXT):
+            with open(os.path.join(base, *rel.split("/")), "rb") as f:
+                if f.read(4) == b"\x7fELF":
+                    found.append(rel)
+    return sorted(found)
 
 
-def make_config(base, serial, disc_count, overrides=()):
-    """Copia config-emu-ps4.txt de la base, fijando el serial, el número de discos
-    y los argumentos extra (`overrides`, líneas tipo '--gs-uprender=2x2')."""
+def arg_key(line):
+    """'--clave=valor' o '#--clave=valor' -> '--clave'; None si no es una opción."""
+    text = line.strip().lstrip("#").strip()
+    return text.partition("=")[0].strip() if text.startswith("--") else None
+
+
+def parse_args(text):
+    """Opciones de un archivo de configuración (ignora comentarios)."""
+    return [ln.strip() for ln in text.splitlines() if ln.strip().startswith("--")]
+
+
+def make_config(base, serial, disc_count, overrides=(), drop=()):
+    """Copia config-emu-ps4.txt de la base fijando el serial y el número de discos, y aplica
+    `overrides` (líneas '--clave=valor', la última gana). Las claves de `drop` se quitan
+    (salvo que estén en overrides): sirve para que la configuración oficial del juego mande."""
     path = os.path.join(base, CONFIG_NAME)
     lines = []
     if os.path.isfile(path):
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = [ln.rstrip("\r\n") for ln in f]
 
-    wanted = [f"--ps2-title-id={serial}", f"--max-disc-num={disc_count}"] + list(overrides)
-    for arg in wanted:
-        key, _ = _split(arg)
-        for i, ln in enumerate(lines):
-            if ln.strip().startswith("--") and _split(ln)[0] == key:
-                lines[i] = arg
-                break
-        else:
-            lines.append(arg)
-    return "\n".join(lines) + "\n"
+    wanted = {}
+    for arg in [f"--ps2-title-id={serial}", f"--max-disc-num={disc_count}", *overrides]:
+        wanted[arg_key(arg)] = arg.strip()
+    out = []
+    for ln in lines:
+        key = arg_key(ln)
+        commented = ln.strip().startswith("#")
+        if key in wanted:
+            if wanted[key] is not None:
+                out.append(wanted[key])  # reemplaza en su lugar, aunque estuviera comentada
+                wanted[key] = None
+            continue
+        if key and not commented and key in drop:
+            continue
+        if commented and disc_count > 1 and key == "--path-toolingscript":
+            ln = ln.strip().lstrip("#")  # el script de cambio de disco es necesario con varios discos
+        out.append(ln)
+    out += [arg for arg in wanted.values() if arg is not None]
+    return "\n".join(out) + "\n"

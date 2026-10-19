@@ -65,13 +65,9 @@ class DiscImage:
             out += self.read_sector(lba + i)
         return bytes(out[:size])
 
-    def find_root_file(self, name):
-        """Devuelve (lba, tamaño) de un archivo en el directorio raíz, o None."""
-        pvd = self.read_sector(16)
-        root = pvd[156:190]
-        root_lba = struct.unpack_from("<I", root, 2)[0]
-        root_size = struct.unpack_from("<I", root, 10)[0]
-        data = self.read_extent(root_lba, root_size)
+    def _find_in_dir(self, lba, size, name):
+        """Busca `name` en un directorio; devuelve (lba, tamaño, es_directorio) o None."""
+        data = self.read_extent(lba, size)
         pos = 0
         while pos < len(data):
             rec_len = data[pos]
@@ -81,15 +77,27 @@ class DiscImage:
                 continue
             name_len = data[pos + 32]
             raw_name = data[pos + 33:pos + 33 + name_len].decode("ascii", "replace")
-            if raw_name.split(";")[0].upper() == name.upper():
-                lba = struct.unpack_from("<I", data, pos + 2)[0]
-                size = struct.unpack_from("<I", data, pos + 10)[0]
-                return lba, size
+            if raw_name.split(";")[0].rstrip(".").upper() == name.upper():
+                return (struct.unpack_from("<I", data, pos + 2)[0],
+                        struct.unpack_from("<I", data, pos + 10)[0],
+                        bool(data[pos + 25] & 2))
             pos += rec_len
         return None
 
-    def read_root_file(self, name):
-        entry = self.find_root_file(name)
+    def find_file(self, path):
+        """Devuelve (lba, tamaño) de un archivo ('SYSTEM.CNF' o 'DATA\\SLUS_209.46'), o None."""
+        root = self.read_sector(16)[156:190]
+        lba, size = struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0]
+        parts = [p for p in re.split(r"[\\/]", path) if p]
+        for i, part in enumerate(parts):
+            entry = self._find_in_dir(lba, size, part.split(";")[0])
+            if entry is None or entry[2] != (i < len(parts) - 1):
+                return None
+            lba, size = entry[0], entry[1]
+        return lba, size
+
+    def read_file(self, path):
+        entry = self.find_file(path)
         if entry is None:
             return None
         return self.read_extent(*entry)
@@ -115,7 +123,8 @@ class DiscImage:
         self.close()
 
 
-SERIAL_RE = re.compile(r"BOOT2\s*=\s*cdrom0:\\?([A-Z]{4})[_-](\d{3})\.?(\d{2})", re.IGNORECASE)
+SERIAL_RE = re.compile(r"BOOT2\s*=\s*cdrom0:\\?(?:[^\r\n;]*\\)?([A-Z]{4})[_-](\d{3})\.?(\d{2})", re.IGNORECASE)
+BOOT_PATH_RE = re.compile(r"BOOT2\s*=\s*cdrom0:\\?([^\r\n;]+)", re.IGNORECASE)
 
 
 def parse_serial(system_cnf):
@@ -129,7 +138,23 @@ def parse_serial(system_cnf):
 
 
 def read_serial(disc):
-    cnf = disc.read_root_file("SYSTEM.CNF")
+    cnf = disc.read_file("SYSTEM.CNF")
     if cnf is None:
         raise DiscError(f"{disc.path}: no contiene SYSTEM.CNF; ¿es un disco de PS2?")
     return parse_serial(cnf.decode("ascii", "replace"))
+
+
+def read_boot_elf(disc):
+    """Contenido del ejecutable principal indicado en BOOT2, o None."""
+    cnf = disc.read_file("SYSTEM.CNF")
+    m = BOOT_PATH_RE.search(cnf.decode("ascii", "replace")) if cnf else None
+    return disc.read_file(m.group(1).strip()) if m else None
+
+
+def elf_crc(data):
+    """CRC de PCSX2: XOR de todas las palabras de 32 bits del ELF. Identifica la versión
+    exacta del juego (los parches de PCSX2 se nombran SERIAL_CRC.pnach)."""
+    crc = 0
+    for (word,) in struct.iter_unpack("<I", data[:len(data) // 4 * 4]):
+        crc ^= word
+    return crc

@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 tools/*
 !tools/LEEME.txt
+!tools/build_pkgtool.py
+!tools/win-x64/
 *_work/
 *.pkg
