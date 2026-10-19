@@ -1,7 +1,8 @@
 name: Windows .exe
 
 # Crea PS-Classics-fPKG.exe en Windows, pasa las pruebas, comprueba que el propio .exe
-# genera un PKG válido y, al subir una etiqueta v*, lo publica en Releases.
+# genera un PKG válido y lo publica en Releases como la versión de ps2fpkg/__init__.py
+# (en cada cambio a main se actualiza el .exe de esa versión).
 on:
   push:
     branches: [main]
@@ -53,10 +54,19 @@ jobs:
           name: PS-Classics-fPKG-windows
           path: dist/PS-Classics-fPKG.exe
 
+      - name: Versión
+        id: version
+        shell: pwsh
+        run: echo "tag=v$(python -c 'import ps2fpkg; print(ps2fpkg.__version__)')" >> $env:GITHUB_OUTPUT
+
       - name: Publicar en Releases
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: PS Classics fPKG ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: dist/PS-Classics-fPKG.exe
           body: |
             **PS-Classics-fPKG.exe** para Windows: doble clic y listo (no hace falta instalar Python).
