@@ -121,9 +121,19 @@ con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno,
 5. **Internet** (opcional, PS2): para descargar los parches de PCSX2 y la configuración oficial.
    Se guardan en `~/.ps2fpkg/cache`. Sin internet: `--parches CARPETA` con archivos `.pnach`.
 
+## Descargar (Windows)
+
+Descarga **PS-Classics-fPKG.exe** desde [Releases](https://github.com/SlowRec/ps2-fpkg/releases/latest)
+y ábrelo con doble clic: no hace falta instalar Python ni nada más (incluye PkgTool, eboot_decrypt
+y los emuladores de NES y SNES). La primera vez tarda unos segundos en abrir.
+Si Windows SmartScreen avisa, elige *Más información → Ejecutar de todas formas*.
+
+El .exe se crea automáticamente en GitHub Actions (`.github/workflows/windows-exe.yml`): pasa
+todas las pruebas en Windows, crea un PKG de prueba con el propio .exe y lo verifica.
+
 ## Uso con ventana
 
-Windows: doble clic en `PS2-fPKG.bat`. En cualquier sistema: `python -m ps2fpkg`
+Con el .exe: doble clic. Desde el código: `PS2-fPKG.bat` en Windows o `python -m ps2fpkg`.
 
 1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES).
 2. Agrega el juego (el serial, el nombre y la carátula se detectan solos) y, en PS1/PS2/PSP,

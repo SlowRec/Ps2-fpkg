@@ -1,0 +1,64 @@
+name: Windows .exe
+
+# Crea PS-Classics-fPKG.exe en Windows, pasa las pruebas, comprueba que el propio .exe
+# genera un PKG válido y, al subir una etiqueta v*, lo publica en Releases.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias
+        run: python -m pip install --upgrade pip pillow pyinstaller
+
+      - name: Pruebas (con PkgTool real)
+        env:
+          PS2FPKG_PKGTOOL: tools\win-x64\PkgTool.Core.exe
+        run: python -m unittest discover tests -v
+
+      - name: Crear el .exe
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name PS-Classics-fPKG
+          --icon assets/icon.ico
+          --add-data "tools/win-x64;tools/win-x64"
+          --add-data "emus;emus"
+          ps_classics_fpkg.py
+
+      - name: Probar el .exe (crea un PKG de SNES de prueba)
+        shell: pwsh
+        run: |
+          python -c "open('prueba.sfc', 'wb').write(bytes(512 * 1024))"
+          $p = Start-Process dist\PS-Classics-fPKG.exe -ArgumentList 'snes', 'prueba.sfc', '-o', 'salida' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El .exe terminó con código $($p.ExitCode)" }
+          $pkg = Get-ChildItem salida\*.pkg
+          if (-not $pkg) { throw "El .exe no creó el PKG" }
+          & tools\win-x64\PkgTool.Core.exe pkg_validate $pkg.FullName | Tee-Object -Variable report
+          if ($report -match '\[ERROR\]') { throw "El PKG creado por el .exe no pasó la verificación" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PS-Classics-fPKG-windows
+          path: dist/PS-Classics-fPKG.exe
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/PS-Classics-fPKG.exe
+          body: |
+            **PS-Classics-fPKG.exe** para Windows: doble clic y listo (no hace falta instalar Python).
+            Incluye PkgTool parcheado, eboot_decrypt y los emuladores de NES y SNES.
+            Si Windows SmartScreen avisa, elige "Más información" → "Ejecutar de todas formas".

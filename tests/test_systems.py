@@ -147,9 +147,15 @@ class PspTests(Base):
         write(os.path.join(self.base, "config-title.txt"), '--image="data/USER_L0.IMG"\n--trophies=1\n--antialias=off\n')
         write(os.path.join(self.base, "data/USER_L0.IMG"), b"UMD original")
         # Descifrador simulado: escribe un ELF más corto que el EBOOT cifrado.
-        self.tool = os.path.join(self.dir, "eboot_decrypt")
-        write(self.tool, '#!/bin/sh\nprintf "\\177ELF-descifrado" > "$2"\n')
-        os.chmod(self.tool, 0o755)
+        script = os.path.join(self.dir, "falso.py")
+        write(script, "import sys\nopen(sys.argv[2], 'wb').write(b'\\x7fELF-descifrado')\n")
+        if os.name == "nt":
+            self.tool = os.path.join(self.dir, "eboot_decrypt.bat")
+            write(self.tool, f'@"{sys.executable}" "{script}" %*\r\n')
+        else:
+            self.tool = os.path.join(self.dir, "eboot_decrypt")
+            write(self.tool, f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
+            os.chmod(self.tool, 0o755)
 
     def test_info(self):
         self.assertEqual(psp.read_info(self.iso), ("ULUS-10041", "Juego PSP"))

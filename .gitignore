@@ -11,3 +11,7 @@ tools/linux-x64/*
 !tools/linux-x64/pspdecrypt-LICENSE.txt
 *_work/
 *.pkg
+
+build/
+dist/
+*.spec
