@@ -102,3 +102,20 @@ index 690c3a4..9bd8bff 100644
          uiEmu->setExitOnStop(true);
          uiEmu->load(game);
      }
+diff --git a/src/skeleton/ui_emu.cpp b/src/skeleton/ui_emu.cpp
+index eb6a6a1..49d17db 100644
+--- a/src/skeleton/ui_emu.cpp
++++ b/src/skeleton/ui_emu.cpp
+@@ -50,7 +50,12 @@ void UiEmu::addVideo(uint8_t **pixels, int *pitch,
+ int UiEmu::load(const Game &game) {
+     printf("UiEmu::load: name: %s, path: %s\n",
+            game.path.c_str(), game.romsPath.c_str());
++#if defined(__PS4__) || defined(PEMU_AUTOBOOT)
++    // ps2-fpkg: en PS4 MENU1/MENU2 son R1/L1; se indica con los nombres de los botones.
++    pMain->getUiStatusBox()->show("L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA");
++#else
+     pMain->getUiStatusBox()->show("TIPS: PRESS MENU1 + MENU2 BUTTONS FOR IN GAME MENU...");
++#endif
+     currentGame = game;
+ 
+     // set fps text on top

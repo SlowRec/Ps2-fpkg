@@ -8,7 +8,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__, builder, install, ps1, psp, retro
+from . import __version__, builder, covers, images, install, ps1, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -36,22 +36,24 @@ class Spec:
 def _ps2_options(v, files, flags, quality, args):
     return builder, builder.Options(
         isos=files, emu_dir=v["emu_dir"], output_dir=v["output_dir"], title=v["title"], serial=v["serial"],
-        icon=v["icon"], background=v["background"], config_lua=v.get("config_lua", ""),
-        cli_conf=v.get("cli_conf", ""), emu_args=args, pkgtool=v["pkgtool"], gp4_only=v["gp4_only"],
+        icon=v["icon"], background=v["background"], cover=v["cover"], find_cover=not v["cover"],
+        config_lua=v.get("config_lua", ""), cli_conf=v.get("cli_conf", ""), emu_args=args, pkgtool=v["pkgtool"], gp4_only=v["gp4_only"],
         quality=quality, **flags)
 
 
 def _ps1_options(v, files, flags, quality, args):
     return ps1, ps1.Options(
         discs=files, emu_dir=v["emu_dir"], output_dir=v["output_dir"], title=v["title"], serial=v["serial"],
-        icon=v["icon"], background=v["background"], config_lua=v.get("config_lua", ""), emu_args=args,
+        icon=v["icon"], background=v["background"], cover=v["cover"], find_cover=not v["cover"],
+        config_lua=v.get("config_lua", ""), emu_args=args,
         pkgtool=v["pkgtool"], gp4_only=v["gp4_only"], quality=quality, **flags)
 
 
 def _psp_options(v, files, flags, quality, args):
     return psp, psp.Options(
         iso=files[0], emu_dir=v["emu_dir"], output_dir=v["output_dir"], title=v["title"], serial=v["serial"],
-        icon=v["icon"], background=v["background"], emu_args=args, pkgtool=v["pkgtool"],
+        icon=v["icon"], background=v["background"], cover=v["cover"], find_cover=not v["cover"],
+        emu_args=args, pkgtool=v["pkgtool"],
         gp4_only=v["gp4_only"], quality=quality, **flags)
 
 
@@ -59,7 +61,7 @@ def _retro_options(system):
     def make(v, files, flags, quality, _args):
         return retro, retro.Options(
             system=system, rom=files[0], output_dir=v["output_dir"], title=v["title"], icon=v["icon"],
-            background=v["background"], pkgtool=v["pkgtool"], gp4_only=v["gp4_only"], video=quality, **flags)
+            background=v["background"], cover=v["cover"], find_cover=not v["cover"], pkgtool=v["pkgtool"], gp4_only=v["gp4_only"], video=quality, **flags)
     return make
 
 
@@ -122,7 +124,8 @@ class SystemTab(ttk.Frame):
     def __init__(self, parent, app, spec, make_options):
         super().__init__(parent, padding=10)
         self.app, self.spec, self.make_options = app, spec, make_options
-        self.vars = {k: tk.StringVar() for k in ("title", "serial", "emu_dir", "icon", "background", "single")}
+        self.vars = {k: tk.StringVar() for k in ("title", "serial", "emu_dir", "icon", "background", "single", "cover")}
+        self.preview_image = None
         self.vars["emu_dir"].set(app.settings.get(f"emu_dir_{spec.key}", ""))
         for key, _text, _types in spec.extra_files:
             self.vars[key] = tk.StringVar()
@@ -143,7 +146,7 @@ class SystemTab(ttk.Frame):
         if s.multi:
             ttk.Label(self, text=s.files_label).grid(row=row, column=0, sticky="nw", pady=2)
             box = ttk.Frame(self)
-            box.grid(row=row, column=1, columnspan=2, sticky="ew")
+            box.grid(row=row, column=1, columnspan=3, sticky="ew")
             box.columnconfigure(0, weight=1)
             self.listbox = tk.Listbox(box, height=3)
             self.listbox.grid(row=0, column=0, rowspan=4, sticky="nsew")
@@ -153,7 +156,8 @@ class SystemTab(ttk.Frame):
         else:
             self._field(row, s.files_label, "single", self._pick_single)
         row += 1
-        self._field(row, "Nombre en el menú", "title")
+        first_row = row
+        self._field(row, "Nombre del juego", "title")
         row += 1
         if s.detect:
             self._field(row, "Serial (auto)", "serial")
@@ -161,13 +165,19 @@ class SystemTab(ttk.Frame):
         if s.emu_label:
             self._field(row, s.emu_label, "emu_dir", lambda: self._pick_dir("emu_dir"))
             row += 1
-        self._field(row, "Icono (opcional)", "icon", lambda: self._pick_file("icon", IMAGES))
+        self._field(row, "Carátula", "cover", lambda: self._pick_file("cover", IMAGES))
+        ttk.Button(self, text="Buscar", command=self.search_cover).grid(row=row, column=3, padx=(6, 0))
         row += 1
-        self._field(row, "Fondo (opcional)", "background", lambda: self._pick_file("background", IMAGES))
+        self._field(row, "Icono propio (opcional)", "icon", lambda: self._pick_file("icon", IMAGES))
         row += 1
+        self._field(row, "Fondo propio (opcional)", "background", lambda: self._pick_file("background", IMAGES))
+        row += 1
+        self.preview = ttk.Label(self, anchor="center", text="Sin carátula", width=16)
+        self.preview.grid(row=first_row, column=4, rowspan=row - first_row, padx=(10, 0), sticky="n")
+        self.vars["cover"].trace_add("write", lambda *_: self._show_preview())
 
         q = ttk.LabelFrame(self, text="Calidad de imagen y sonido", padding=8)
-        q.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(8, 2))
+        q.grid(row=row, column=0, columnspan=5, sticky="ew", pady=(8, 2))
         q.columnconfigure(1, weight=1)
         ttk.Label(q, text=s.quality_label).grid(row=0, column=0, sticky="w")
         ttk.Combobox(q, textvariable=self.quality, values=list(s.quality), state="readonly"
@@ -188,7 +198,7 @@ class SystemTab(ttk.Frame):
             self.emu_args.grid(row=qrow, column=1, columnspan=2, sticky="ew", pady=2)
         row += 1
         if s.note:
-            ttk.Label(self, text=s.note, foreground="#555").grid(row=row, column=0, columnspan=3, sticky="w", pady=(6, 0))
+            ttk.Label(self, text=s.note, foreground="#555").grid(row=row, column=0, columnspan=5, sticky="w", pady=(6, 0))
 
     # --- Selección de archivos -----------------------------------------
     def _pick_dir(self, key):
@@ -243,10 +253,53 @@ class SystemTab(ttk.Frame):
                 serial = self.spec.detect(path)
             except Exception as e:  # noqa: BLE001 — se muestra al usuario
                 self.app.append(f"No se pudo leer el serial de {os.path.basename(path)}: {e}")
-                return
+                serial = None
             if serial:
                 self.vars["serial"].set(serial)
                 self.app.append(f"Serial detectado: {serial}")
+        if not self.vars["cover"].get():
+            self.search_cover(quiet=True)
+
+    # --- Carátula -------------------------------------------------------
+    def search_cover(self, quiet=False):
+        """Busca la carátula en segundo plano (por serial y por nombre)."""
+        files = self.files()
+        names = [os.path.basename(files[0])] if files else []
+        names.append(self.vars["title"].get().strip())
+        serial = self.vars["serial"].get().strip().upper()
+        if not any(names) and not serial:
+            if not quiet:
+                messagebox.showinfo("Carátula", "Elige el juego o escribe su nombre primero.")
+            return
+        self.app.append("Buscando carátula...")
+
+        def work():
+            try:
+                path = covers.find(self.spec.key, serial, [n for n in names if n], log=self.app.log_threadsafe)
+            except OSError as e:
+                self.app.log_threadsafe(f"Carátula: no se pudo buscar ({e}).")
+                path = None
+            if path:
+                self.app.events.put(("call", lambda: self.vars["cover"].set(path)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_preview(self):
+        path = self.vars["cover"].get().strip()
+        if not path or not os.path.isfile(path):
+            self.preview.configure(image="", text="Sin carátula")
+            return
+        if images.Image is None:
+            self.preview.configure(image="", text="(instala Pillow\npara la vista previa)")
+            return
+        try:
+            from PIL import ImageTk
+            img = images.Image.open(path)
+            img.thumbnail((150, 190))
+            self.preview_image = ImageTk.PhotoImage(img)
+            self.preview.configure(image=self.preview_image, text="")
+        except Exception:  # noqa: BLE001 — una imagen inválida no debe romper la ventana
+            self.preview.configure(image="", text="Imagen no válida")
 
     # --- Opciones ------------------------------------------------------
     def files(self):
@@ -405,6 +458,8 @@ class App(ttk.Frame):
     def _log(self, msg):
         self.events.put(("log", msg))
 
+    log_threadsafe = _log
+
     def _build(self, module, opts, send_to):
         def progress(done, total):
             self.events.put(("progress", done * 100 // max(1, total)))
@@ -440,6 +495,8 @@ class App(ttk.Frame):
                 kind, data = self.events.get_nowait()
                 if kind == "log":
                     self.append(data)
+                elif kind == "call":
+                    data()
                 elif kind == "progress":
                     self.progress.stop()
                     self.progress.configure(mode="determinate", value=data)

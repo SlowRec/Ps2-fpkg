@@ -110,19 +110,30 @@ class Package:
     def add(self, rel, source):
         self.files[rel] = os.path.abspath(source)
 
-    def build(self, *, title, title_id, icon="", background="", subtitle="", pkgtool="",
+    def build(self, *, title, title_id, icon="", background="", cover="", subtitle="", pkgtool="",
               gp4_only=False, keep_work=False, validate=True, log=print, icon_fit="cover"):
         """Añade param.sfo e imágenes, crea el PKG y lo verifica. Devuelve la ruta del .pkg
-        (o del .gp4 si gp4_only)."""
+        (o del .gp4 si gp4_only). Imágenes: icono/fondo propios > carátula > genéricas con el título."""
         validate_ids(title_id, self.content_id)
         self.write("sce_sys/param.sfo", sfo.ps2_classic(title, title_id, self.content_id))
         log("Generando imágenes del menú...")
-        for rel, size, src, fit in (("sce_sys/icon0.png", images.ICON_SIZE, icon, icon_fit),
-                                    ("sce_sys/pic0.png", images.BG_SIZE, background, "cover"),
-                                    ("sce_sys/pic1.png", images.BG_SIZE, background, "cover")):
-            images.make(self.path(rel), size, src or None, title=title, fit=fit,
-                        **({"subtitle": subtitle} if subtitle else {}))
-            self.files[rel] = self.path(rel)
+        if cover and images.Image is None:
+            log("Aviso: instala Pillow (pip install pillow) para usar la carátula; se usan imágenes genéricas.")
+            cover = ""
+        extra = {"subtitle": subtitle} if subtitle else {}
+        icon_path = self.path("sce_sys/icon0.png")
+        if icon or not cover:
+            images.make(icon_path, images.ICON_SIZE, icon or None, title=title, fit=icon_fit, **extra)
+        else:
+            images.icon_from_cover(cover, icon_path)
+        self.files["sce_sys/icon0.png"] = icon_path
+        for rel in ("sce_sys/pic0.png", "sce_sys/pic1.png"):
+            path = self.path(rel)
+            if background or not cover:
+                images.make(path, images.BG_SIZE, background or None, title=title, **extra)
+            else:
+                images.background_from_cover(cover, path)
+            self.files[rel] = path
 
         gp4_path = os.path.join(self.work, "project.gp4")
         with open(gp4_path, "wb") as f:

@@ -17,6 +17,31 @@ con **GoldHEN** (por USB o directamente por la red).
 > PSP salen de juegos clásicos de PS4 que tengas tú, y los juegos deben ser copias de los tuyos.
 > Los emuladores de NES y SNES incluidos son software libre (GPL-3.0).
 
+## Menú dentro del juego: partidas guardadas y pantalla
+
+| Consola | Cómo se abre | Qué tiene |
+| --- | --- | --- |
+| PS1 | botón **OPTIONS** | estados guardados (varias ranuras), **rebobinar**, presets visuales y el menú **Gráficos** (resolución, filtro Lanczos/cúbico, antialiasing), que la app deja activado |
+| PSP | el menú del emulador de PlayStation Plus (como en PS1) | estados guardados y **rebobinar**; la calidad de imagen se elige en la app antes de crear el PKG |
+| NES / SNES | **L1 + R1** | 4 ranuras de estados guardados (con miniatura), escalado, filtro, shader, mandos y salir. Al empezar el juego aparece el aviso «L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA» |
+| PS2 | — | el emulador de PS2 de Sony **no trae menú**: las partidas se guardan en la tarjeta de memoria virtual desde el propio juego, y la pantalla se configura en la app antes de crear el PKG |
+
+En PS2 se podría construir un menú propio con funciones internas del emulador, pero no están
+documentadas y no se pueden probar sin la consola; un error ahí puede impedir que arranque el
+juego, así que no se incluye.
+
+## Nombre y carátula
+
+- **Nombre del juego:** el que escribas es el que aparece en el menú de la PS4 (por defecto, el
+  nombre del archivo sin etiquetas como «(USA)»).
+- **Carátula:** con una sola imagen se hacen el **icono** (la carátula entera sobre una versión
+  desenfocada de sí misma) y el **fondo** (la carátula desenfocada de fondo y nítida a la derecha).
+- **Buscar carátula:** al elegir el juego la app la busca sola y la muestra; también con el botón
+  **Buscar** o `--buscar-caratula`. PS1 y PS2 se buscan por serial (colecciones de carátulas que
+  usan DuckStation y PCSX2) y todas las consolas por nombre en las carátulas de libretro. Si no
+  aparece o no es la que quieres, elige tu propia imagen.
+- **Icono propio / fondo propio:** reemplazan a los hechos con la carátula.
+
 ## Calidad de imagen y sonido
 
 En todas las consolas el perfil por defecto es el de **máxima calidad**; cada pestaña permite
@@ -101,7 +126,8 @@ con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno,
 Windows: doble clic en `PS2-fPKG.bat`. En cualquier sistema: `python -m ps2fpkg`
 
 1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES).
-2. Agrega el juego (el serial y el nombre se detectan solos) y, en PS1/PS2/PSP, el **emulador base**.
+2. Agrega el juego (el serial, el nombre y la carátula se detectan solos) y, en PS1/PS2/PSP,
+   el **emulador base**. Cambia el nombre o la carátula si quieres.
 3. Revisa **Calidad de imagen y sonido** (ya viene en máxima).
 4. Para instalar por red, escribe la **IP de la PS4** y marca **Enviar a la PS4 al terminar**.
 5. **Crear fPKG**.
@@ -116,6 +142,7 @@ python -m ps2fpkg ps1 "Crash Bandicoot.cue" -e base_ps1 -o salida
 python -m ps2fpkg psp "LocoRoco.iso" -e base_psp -o salida
 python -m ps2fpkg nes "Super Mario Bros. (World).nes" -o salida
 python -m ps2fpkg snes "Super Metroid (USA).sfc" -o salida --imagen crt --instalar-en 192.168.1.50
+python -m ps2fpkg nes "zelda.nes" -t "Zelda (mi copia)" --caratula portada.jpg
 ```
 
 `python -m ps2fpkg ps1 --help` (o `ps2`, `psp`, `nes`, `snes`) muestra todas las opciones.
@@ -148,7 +175,8 @@ debe estar en **exFAT** (FAT32 no admite archivos tan grandes); la app avisa cua
 - **PSP:** copia de la ISO con el EBOOT descifrado en `data/USER_L0.IMG`, opciones en `config-title.txt`.
 - **NES/SNES:** la app pemu con la ROM en `autoboot/`. La versión incluida tiene un parche
   (`tools/pemu-autoboot.patch`) para que, al abrir el juego desde el menú de la PS4, cargue esa
-  ROM directamente con los ajustes de imagen elegidos, y que al salir del juego se cierre.
+  ROM directamente con los ajustes de imagen elegidos, que al salir del juego se cierre, y que
+  el aviso inicial indique en PS4 cómo abrir el menú (L1 + R1).
   Partidas guardadas: `/data/pnes` y `/data/psnes` en la PS4.
 
 En todas: `sce_sys/param.sfo`, `icon0.png`, `pic0.png`, `pic1.png`, `project.gp4`,
@@ -171,6 +199,8 @@ SNES, los verifican, los extraen y comprueban su contenido.
 - [PCSX2 patches](https://github.com/PCSX2/pcsx2_patches) — parches de imagen de PS2 (se descargan, no se incluyen).
 - [Playstation-2-Classics-Patches-PS4](https://github.com/xXxTheDarkprogramerxXx/Playstation-2-Classics-Patches-PS4) — configuraciones oficiales de PS2 (se descargan, no se incluyen).
 - [Remote Package Installer](https://github.com/flatz/ps4_remote_pkg_installer) — instalación por red.
+- Carátulas: [ps2-covers](https://github.com/xlenore/ps2-covers) y [psx-covers](https://github.com/xlenore/psx-covers)
+  (por serial) y [libretro-thumbnails](https://thumbnails.libretro.com/) (por nombre); se descargan, no se incluyen.
 - Formato del TOC de PS1 contrastado con [Cue2toc](https://github.com/Goatman13/Cue2toc); opciones de
   los emuladores contrastadas con PS-Classics-fPKG-Builder, mkps4, easy-ps2-fpkg y las notas de
   [PlayStation-PS1HD](https://github.com/andshrew/PlayStation-PS1HD).

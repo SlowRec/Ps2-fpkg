@@ -4,7 +4,7 @@ import dataclasses
 import os
 import re
 
-from . import db, emu, iso, pkgbuild, pnach
+from . import covers, db, emu, iso, pkgbuild, pnach
 from .pkgbuild import FAT32_LIMIT, BuildError, find_pkgtool, validate_ids
 
 __all__ = ["Options", "build", "detect_serial", "title_id_from_serial", "content_id_for",
@@ -23,8 +23,10 @@ class Options:
     serial: str = ""            # vacío = se lee de SYSTEM.CNF
     title_id: str = ""          # vacío = derivado del serial (SLUS-20946 -> SLUS20946)
     content_id: str = ""        # vacío = derivado del title_id
-    icon: str = ""
-    background: str = ""
+    icon: str = ""              # icono propio (si no, se hace con la carátula)
+    background: str = ""        # fondo propio (si no, se hace con la carátula)
+    cover: str = ""             # carátula: genera icono y fondo
+    find_cover: bool = False    # buscar la carátula en internet si no se indica
     config_lua: str = ""        # patches/<SERIAL>_config.lua
     cli_conf: str = ""          # patches/<SERIAL>_cli.conf (si se da, reemplaza a la oficial)
     emu_args: list = dataclasses.field(default_factory=list)
@@ -184,6 +186,7 @@ def build(opts, log=print, progress=None):
     log("config-emu-ps4.txt: " + "  ".join(a for a in emu.parse_args(config)
                                             if emu.arg_key(a).startswith(("--gs-", "--host-"))))
 
-    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background,
+    cover = covers.resolve(opts, "ps2", serial, [os.path.basename(opts.isos[0]), opts.title], log)
+    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
                      pkgtool=opts.pkgtool, gp4_only=opts.gp4_only, keep_work=opts.keep_work,
                      validate=opts.validate, log=log)

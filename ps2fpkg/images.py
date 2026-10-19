@@ -123,3 +123,46 @@ def _contain(img, size):
     canvas = Image.open(io.BytesIO(_gradient(tw, th))).convert("RGB")
     canvas.paste(img, ((tw - img.width) // 2, (th - img.height) // 2))
     return canvas
+
+
+def _backdrop(img, size, blur, darken):
+    """La imagen llenando `size`, desenfocada y oscurecida (fondo a juego con la carátula)."""
+    from PIL import ImageEnhance, ImageFilter
+    bg = _cover(img, size).filter(ImageFilter.GaussianBlur(blur))
+    return ImageEnhance.Brightness(bg).enhance(darken)
+
+
+def _shadow(canvas, box, radius=18, opacity=150):
+    from PIL import ImageFilter
+    shadow = Image.new("L", canvas.size, 0)
+    ImageDraw.Draw(shadow).rectangle(box, fill=opacity)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(radius))
+    canvas.paste((0, 0, 0), (0, 0), shadow)
+
+
+def icon_from_cover(src, dst, size=ICON_SIZE):
+    """Icono cuadrado: la carátula entera sobre una versión desenfocada de sí misma."""
+    img = Image.open(src).convert("RGB")
+    canvas = _backdrop(img, size, blur=18, darken=0.55)
+    inner = (round(size[0] * 0.9), round(size[1] * 0.9))
+    scale = min(inner[0] / img.width, inner[1] / img.height)
+    fg = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+    pos = ((size[0] - fg.width) // 2, (size[1] - fg.height) // 2)
+    _shadow(canvas, (pos[0] + 6, pos[1] + 8, pos[0] + fg.width + 6, pos[1] + fg.height + 8), radius=10)
+    canvas.paste(fg, pos)
+    canvas.save(dst, "PNG")
+
+
+def background_from_cover(src, dst, size=BG_SIZE):
+    """Fondo de pantalla: la carátula desenfocada de fondo y nítida a la derecha."""
+    img = Image.open(src).convert("RGB")
+    canvas = _backdrop(img, size, blur=40, darken=0.45)
+    height = round(size[1] * 0.78)
+    fg = img.resize((max(1, round(img.width * height / img.height)), height), Image.LANCZOS)
+    if fg.width > size[0] * 0.45:  # carátulas apaisadas
+        width = round(size[0] * 0.45)
+        fg = img.resize((width, max(1, round(img.height * width / img.width))), Image.LANCZOS)
+    pos = (round(size[0] * 0.74 - fg.width / 2), (size[1] - fg.height) // 2)
+    _shadow(canvas, (pos[0] + 10, pos[1] + 14, pos[0] + fg.width + 10, pos[1] + fg.height + 14), radius=22)
+    canvas.paste(fg, pos)
+    canvas.save(dst, "PNG")

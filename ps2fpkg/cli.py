@@ -17,6 +17,15 @@ from . import builder, cue, emu, install, iso, ps1, psp, retro
 SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes")
 
 
+def _cover_args(p):
+    g = p.add_argument_group("nombre e imágenes del juego en la PS4")
+    g.add_argument("--caratula", default="", help="imagen de la carátula: con ella se hacen el icono y el fondo")
+    g.add_argument("--buscar-caratula", action="store_true",
+                   help="buscar la carátula en internet (por serial o por nombre) si no se indica una")
+    g.add_argument("--icon", default="", help="icono propio (reemplaza al de la carátula; se ajusta a 512x512)")
+    g.add_argument("--background", default="", help="fondo propio (reemplaza al de la carátula; 1920x1080)")
+
+
 def _common(p, emu_required=True, emu_help="carpeta del emulador (la app de PS4 extraída, con eboot.bin)"):
     """Opciones compartidas por todas las consolas."""
     p.add_argument("-e", "--emu", required=emu_required, default="", help=emu_help)
@@ -24,8 +33,7 @@ def _common(p, emu_required=True, emu_help="carpeta del emulador (la app de PS4 
     p.add_argument("-t", "--title", default="", help="nombre que se mostrará en el menú de PS4")
     p.add_argument("--title-id", default="", help="TITLE_ID del PKG (4 letras y 5 números)")
     p.add_argument("--content-id", default="", help="CONTENT_ID del PKG (36 caracteres)")
-    p.add_argument("--icon", default="", help="imagen para el icono (se ajusta a 512x512)")
-    p.add_argument("--background", default="", help="imagen de fondo (se ajusta a 1920x1080)")
+    _cover_args(p)
     k = p.add_argument_group("empaquetado e instalación")
     k.add_argument("--pkgtool", default="", help="ruta a PkgTool; por defecto el de tools/")
     k.add_argument("--gp4-only", action="store_true", help="solo preparar el proyecto .gp4, sin crear el PKG")
@@ -80,7 +88,7 @@ def parse_system(cmd, argv):
 
 def system_options(cmd, a):
     common = dict(output_dir=a.output, title=a.title, title_id=a.title_id, content_id=a.content_id,
-                  icon=a.icon, background=a.background, pkgtool=a.pkgtool, gp4_only=a.gp4_only,
+                  icon=a.icon, background=a.background, cover=a.caratula, find_cover=a.buscar_caratula, pkgtool=a.pkgtool, gp4_only=a.gp4_only,
                   keep_work=a.keep_work, emu_dir=a.emu)
     if cmd == "ps1":
         return ps1, ps1.Options(discs=a.discos, serial=a.serial, quality=a.calidad, graphics_menu=a.graphics_menu,
@@ -106,8 +114,7 @@ def parse_convert(argv):
     p.add_argument("--serial", default="", help="serial del juego, p. ej. SLUS-20946 (por defecto se lee del disco)")
     p.add_argument("--title-id", default="", help="TITLE_ID del PKG (por defecto el serial sin guion)")
     p.add_argument("--content-id", default="", help="CONTENT_ID del PKG (36 caracteres)")
-    p.add_argument("--icon", default="", help="imagen para icon0.png (se ajusta a 512x512)")
-    p.add_argument("--background", default="", help="imagen de fondo pic0/pic1 (se ajusta a 1920x1080)")
+    _cover_args(p)
 
     q = p.add_argument_group("calidad de imagen y sonido")
     q.add_argument("-q", "--calidad", choices=sorted(emu.QUALITY_PROFILES), default="maxima",
@@ -195,7 +202,7 @@ def main(argv=None):
         opts = builder.Options(
             isos=a.iso, emu_dir=a.emu, output_dir=a.output, title=a.title, serial=a.serial,
             title_id=a.title_id, content_id=a.content_id, icon=a.icon, background=a.background,
-            config_lua=a.config_lua, cli_conf=a.cli_conf, emu_args=a.emu_arg, quality=a.calidad,
+            cover=a.caratula, find_cover=a.buscar_caratula, config_lua=a.config_lua, cli_conf=a.cli_conf, emu_args=a.emu_arg, quality=a.calidad,
             widescreen=a.widescreen, no_interlace=a.no_interlace, progressive=a.progressive,
             no_blur=a.no_blur, fps60=a.fps60, official_config=a.official_config,
             patches_dir=a.parches, online=a.online, pkgtool=a.pkgtool, gp4_only=a.gp4_only,

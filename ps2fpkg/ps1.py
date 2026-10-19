@@ -5,7 +5,7 @@ import dataclasses
 import os
 import tempfile
 
-from . import builder, cue, emu, iso, pkgbuild
+from . import builder, covers, cue, emu, iso, pkgbuild
 from .pkgbuild import BuildError
 
 CONFIG_NAME = "config-title.txt"
@@ -33,6 +33,8 @@ class Options:
     content_id: str = ""
     icon: str = ""
     background: str = ""
+    cover: str = ""
+    find_cover: bool = False
     quality: str = "maxima"
     graphics_menu: bool = True  # menú "Gráficos" del emulador: filtro Lanczos/AA CMAA desde el juego
     force_60hz: bool = False    # juegos PAL a 60 Hz
@@ -132,6 +134,7 @@ def build(opts, log=print, progress=None):
     log("config-title.txt: " + "  ".join(a for a in emu.parse_args(config)
                                          if emu.arg_key(a) in ("--scale", "--userui-settings-graphics", "--image")))
 
-    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background,
+    cover = covers.resolve(opts, "ps1", serial, [os.path.basename(opts.discs[0]), opts.title], log)
+    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
                      subtitle="PlayStation", pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
                      keep_work=opts.keep_work, validate=opts.validate, log=log)

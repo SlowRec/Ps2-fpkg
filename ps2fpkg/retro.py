@@ -9,7 +9,7 @@ import os
 import re
 import zipfile
 
-from . import emu, pkgbuild
+from . import covers, emu, pkgbuild
 from .pkgbuild import BuildError
 
 EMUS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "emus")
@@ -59,6 +59,8 @@ class Options:
     content_id: str = ""
     icon: str = ""
     background: str = ""
+    cover: str = ""
+    find_cover: bool = False
     video: str = "nitido"
     audio_sync: bool = True     # sonido sincronizado (sin chasquidos); solo SNES
     show_fps: bool = False
@@ -150,6 +152,7 @@ def build(opts, log=print, progress=None):
     pkg.write("autoboot/options.txt", options_text(opts))
     log(f"Imagen: {VIDEO_LABELS[opts.video]}")
 
-    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background,
+    cover = covers.resolve(opts, system.key, names=[os.path.basename(opts.rom), opts.title], log=log)
+    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
                      subtitle=system.name, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
                      keep_work=opts.keep_work, validate=opts.validate, log=log)

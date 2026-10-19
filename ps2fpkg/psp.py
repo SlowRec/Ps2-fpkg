@@ -11,7 +11,7 @@ import struct
 import subprocess
 import tempfile
 
-from . import builder, emu, images, iso, pkgbuild, sfo
+from . import builder, covers, emu, images, iso, pkgbuild, sfo
 from .pkgbuild import BuildError
 
 CONFIG_NAME = "config-title.txt"
@@ -36,8 +36,10 @@ class Options:
     serial: str = ""
     title_id: str = ""
     content_id: str = ""
-    icon: str = ""              # por defecto, el icono del propio UMD
-    background: str = ""        # por defecto, el fondo del propio UMD
+    icon: str = ""              # por defecto, el de la carátula o el del propio UMD
+    background: str = ""        # por defecto, el de la carátula o el del propio UMD
+    cover: str = ""
+    find_cover: bool = False
     quality: str = "maxima"
     emu_args: list = dataclasses.field(default_factory=list)
     eboot_decrypt: str = ""     # ruta a eboot_decrypt; por defecto el de tools/
@@ -133,10 +135,13 @@ def build(opts, log=print, progress=None):
     pkg.add(IMAGE, image)
     decrypt_eboot(image, tool, log)
 
-    # Arte del propio UMD si el usuario no da otro (hace falta Pillow para ampliarlo).
-    icon, background = opts.icon, opts.background
+    # Carátula; si no hay, el arte del propio UMD (hace falta Pillow para ampliarlo).
+    cover = covers.resolve(opts, "psp", serial, [os.path.basename(opts.iso), title], log)
+    icon = opts.icon or ("" if cover else None)              # None = tomarlo del UMD
+    background = opts.background or ("" if cover else None)
     with iso.DiscImage(image) as disc:
-        for want, name, attr in ((not icon, "PSP_GAME/ICON0.PNG", "icon"), (not background, "PSP_GAME/PIC1.PNG", "background")):
+        for want, name, attr in ((icon is None, "PSP_GAME/ICON0.PNG", "icon"),
+                                 (background is None, "PSP_GAME/PIC1.PNG", "background")):
             data = disc.read_file(name) if want and images.Image is not None else None
             if data and data[:8] == b"\x89PNG\r\n\x1a\n":
                 path = os.path.join(pkg.work, os.path.basename(name))
@@ -153,6 +158,7 @@ def build(opts, log=print, progress=None):
     pkg.write(CONFIG_NAME, config)
     log("config-title.txt: " + "  ".join(a for a in emu.parse_args(config) if emu.arg_key(a) in ("--image", "--antialias")))
 
-    return pkg.build(title=title, title_id=title_id, icon=icon, background=background, subtitle="PSP",
+    return pkg.build(title=title, title_id=title_id, icon=icon or "", background=background or "", cover=cover,
+                     subtitle="PSP",
                      pkgtool=opts.pkgtool, gp4_only=opts.gp4_only, keep_work=opts.keep_work,
-                     validate=opts.validate, log=log, icon_fit="cover" if opts.icon else "contain")
+                     validate=opts.validate, log=log, icon_fit="cover" if opts.icon or cover else "contain")

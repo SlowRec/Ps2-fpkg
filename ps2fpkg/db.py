@@ -13,9 +13,12 @@ MISSING = b"\x00missing"
 MISSING_TTL = 7 * 24 * 3600  # volver a consultar ausencias tras una semana
 
 
-def _fetch(url, cache_name, timeout=20):
-    """Contenido de `url` (bytes) o None si no existe. Cachea también las ausencias."""
+def _fetch(url, cache_name, timeout=20, max_age=None):
+    """Contenido de `url` (bytes) o None si no existe. Cachea también las ausencias.
+    `max_age` (segundos): volver a descargar si la copia en caché es más antigua."""
     path = os.path.join(CACHE_DIR, cache_name)
+    if os.path.isfile(path) and max_age is not None and time.time() - os.path.getmtime(path) > max_age:
+        os.remove(path)
     if os.path.isfile(path):
         with open(path, "rb") as f:
             data = f.read()

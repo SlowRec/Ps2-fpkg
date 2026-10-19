@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import cue, emu, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
+from ps2fpkg import covers, cue, emu, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -244,6 +244,47 @@ class RetroTests(Base):
         self.assertEqual(read(os.path.join(root, "autoboot", "rom.txt")), "Juego SNES (Europe).sfc\n")
         self.assertEqual(read(os.path.join(root, "eboot.bin"), "rb")[:4], bytes.fromhex("4f153d1d"))  # fSELF
         self.assertEqual(os.path.getsize(os.path.join(root, "autoboot", "Juego SNES (Europe).sfc")), 512 * 1024)
+
+
+class CoverTests(Base):
+    NAMES = ["Donkey Kong Country (USA)", "Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)",
+             "Donkey Kong Country 2 - Diddy's Kong Quest (Europe) (En,Fr,De)",
+             "Legend of Zelda, The - A Link to the Past (USA)", "Legend of Zelda, The - A Link to the Past (Japan)",
+             "Super Mario World (USA)", "Super Mario World (Europe) (Beta)", "Final Fantasy III (USA)"]
+
+    def test_best_match(self):
+        m = lambda q: covers.best_match(q, self.NAMES)  # noqa: E731
+        self.assertEqual(m("Super Mario World (USA) [!].sfc"), "Super Mario World (USA)")
+        self.assertEqual(m("super mario world"), "Super Mario World (USA)")  # sin la beta
+        self.assertEqual(m("Donkey Kong Country 2"), "Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)")
+        self.assertEqual(m("Donkey Kong Country 2 (Europe)"),
+                         "Donkey Kong Country 2 - Diddy's Kong Quest (Europe) (En,Fr,De)")
+        self.assertEqual(m("Zelda - A Link to the Past"), "Legend of Zelda, The - A Link to the Past (USA)")
+        self.assertEqual(m("Final Fantasy 3.smc"), "Final Fantasy III (USA)")
+        self.assertIsNone(m("Mario"))
+        self.assertIsNone(m("Juego que no existe"))
+
+    def test_resolve_does_not_search_when_given_or_disabled(self):
+        opts = retro.Options(system="snes", rom="x.sfc", output_dir=".", cover="mi.png", find_cover=True)
+        self.assertEqual(covers.resolve(opts, "snes"), "mi.png")
+        opts = retro.Options(system="snes", rom="x.sfc", output_dir=".")
+        self.assertEqual(covers.resolve(opts, "snes"), "")
+
+    @unittest.skipIf(images.Image is None, "requiere Pillow")
+    def test_package_uses_cover(self):
+        cover = os.path.join(self.dir, "caratula.png")
+        images.Image.new("RGB", (300, 420), (200, 30, 30)).save(cover)
+        rom = os.path.join(self.dir, "Juego (USA).nes")
+        write(rom, b"NES\x1a" + bytes(16 * 1024 + 12))
+        gp4 = retro.build(retro.Options(system="nes", rom=rom, output_dir=self.out, gp4_only=True, cover=cover,
+                                        title="Mi nombre"), log=lambda m: None)
+        files = gp4_files(gp4)
+        self.assertEqual(images.png_size(files["sce_sys/icon0.png"]), images.ICON_SIZE)
+        self.assertEqual(images.png_size(files["sce_sys/pic1.png"]), images.BG_SIZE)
+        icon = images.Image.open(files["sce_sys/icon0.png"]).convert("RGB")
+        self.assertEqual(icon.getpixel((256, 256)), (200, 30, 30))  # la carátula, en el centro
+        with open(files["sce_sys/param.sfo"], "rb") as f:
+            self.assertEqual(sfo.parse(f.read())["TITLE"], "Mi nombre")
 
 
 class EmuConfigTests(unittest.TestCase):
