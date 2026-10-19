@@ -2,7 +2,12 @@ __pycache__/
 *.pyc
 tools/*
 !tools/LEEME.txt
-!tools/build_pkgtool.py
+!tools/*.py
+!tools/*.patch
 !tools/win-x64/
+!tools/linux-x64/
+tools/linux-x64/*
+!tools/linux-x64/eboot_decrypt
+!tools/linux-x64/pspdecrypt-LICENSE.txt
 *_work/
 *.pkg

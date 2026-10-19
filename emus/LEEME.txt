@@ -1,0 +1,4 @@
+pnes.zip y psnes.zip: la app de PS4 de pemu (https://github.com/Cpasjuste/pemu, GPL-3.0),
+compilada desde el commit eeb5199ee0657b87f65197cbb043e5014befffbd con tools/pemu-autoboot.patch.
+Para recompilarlas desde el código fuente: python tools/build_pemu.py
+Licencia: pemu-LICENSE.txt

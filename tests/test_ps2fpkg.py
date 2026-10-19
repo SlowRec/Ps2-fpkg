@@ -51,30 +51,51 @@ def _dir_record(name, lba, size, is_dir=False):
 
 
 def make_iso(path, files, raw_mode=None):
-    """ISO9660 mínima. Las claves 'DIR/NOMBRE' crean un subdirectorio (un nivel).
+    """ISO9660 mínima. Las claves pueden tener carpetas ('A/B/ARCHIVO').
     raw_mode=1/2 la guarda como BIN de 2352 bytes/sector."""
-    dirs = sorted({k.split("/")[0] for k in files if "/" in k})
-    dir_lba = {d: 19 + i for i, d in enumerate(dirs)}
-    records = {d: [] for d in ["", *dirs]}
-    data_sectors, lba = [], 19 + len(dirs)
+    tree = {}
     for key, content in files.items():
-        parent, _, name = key.rpartition("/")
-        records[parent].append(_dir_record(name.encode() + b";1", lba, len(content)))
-        n = max(1, (len(content) + 2047) // 2048)
-        padded = content + bytes(n * 2048 - len(content))
-        data_sectors += [padded[i * 2048:(i + 1) * 2048] for i in range(n)]
-        lba += n
+        node = tree
+        *dirs, name = key.split("/")
+        for d in dirs:
+            node = node.setdefault(d, {})
+        node[name] = content
+    # Un sector por directorio (raíz en 18), luego los datos.
+    dir_lbas, order = {}, []
 
-    def dir_sector(own, parent, recs):
-        data = _dir_record(b"\x00", own, 2048, True) + _dir_record(b"\x01", parent, 2048, True) + b"".join(recs)
+    def assign(node, prefix):
+        dir_lbas[prefix] = 18 + len(order)
+        order.append((prefix, node))
+        for name, child in node.items():
+            if isinstance(child, dict):
+                assign(child, prefix + name + "/")
+
+    assign(tree, "")
+    data_sectors, lba, file_lbas = [], 18 + len(order), {}
+    for prefix, node in order:
+        for name, child in node.items():
+            if not isinstance(child, dict):
+                file_lbas[prefix + name] = lba
+                n = max(1, (len(child) + 2047) // 2048)
+                padded = child + bytes(n * 2048 - len(child))
+                data_sectors += [padded[i * 2048:(i + 1) * 2048] for i in range(n)]
+                lba += n
+
+    def dir_sector(prefix, node):
+        parent = dir_lbas[prefix.rsplit("/", 2)[0] + "/" if prefix.count("/") > 1 else ""]
+        data = _dir_record(b"\x00", dir_lbas[prefix], 2048, True) + _dir_record(b"\x01", parent, 2048, True)
+        for name, child in node.items():
+            if isinstance(child, dict):
+                data += _dir_record(name.encode(), dir_lbas[prefix + name + "/"], 2048, True)
+            else:
+                data += _dir_record(name.encode() + b";1", file_lbas[prefix + name], len(child))
         return data + bytes(2048 - len(data))
 
     pvd = bytearray(2048)
     pvd[0:6] = b"\x01CD001"
     pvd[156:190] = _dir_record(b"\x00", 18, 2048, True)
-    root_recs = [_dir_record(d.encode(), dir_lba[d], 2048, True) for d in dirs] + records[""]
-    sectors = [bytes(2048)] * 16 + [bytes(pvd), b"\xffCD001" + bytes(2042), dir_sector(18, 18, root_recs)]
-    sectors += [dir_sector(dir_lba[d], 18, records[d]) for d in dirs] + data_sectors
+    sectors = [bytes(2048)] * 16 + [bytes(pvd), b"\xffCD001" + bytes(2042)]
+    sectors += [dir_sector(prefix, node) for prefix, node in order] + data_sectors
     with open(path, "wb") as f:
         for s in sectors:
             if raw_mode is None:

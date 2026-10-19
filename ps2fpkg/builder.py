@@ -2,20 +2,16 @@
 
 import dataclasses
 import os
-import platform
 import re
-import shutil
-import subprocess
 
-from . import db, emu, gp4, images, iso, pnach, sfo
+from . import db, emu, iso, pkgbuild, pnach
+from .pkgbuild import FAT32_LIMIT, BuildError, find_pkgtool, validate_ids
+
+__all__ = ["Options", "build", "detect_serial", "title_id_from_serial", "content_id_for",
+           "BuildError", "FAT32_LIMIT", "find_pkgtool", "validate_ids"]
 
 REGIONS = {"U": "UP", "E": "EP", "P": "JP", "K": "HP", "A": "HP", "C": "HP"}
 SERIAL_FMT = re.compile(r"^[A-Z]{4}-\d{5}$")
-FAT32_LIMIT = 4 * 1024 ** 3 - 1
-
-
-class BuildError(Exception):
-    pass
 
 
 @dataclasses.dataclass
@@ -53,47 +49,14 @@ def title_id_from_serial(serial):
     return serial.replace("-", "")
 
 
-def content_id_for(title_id):
+def content_id_for(title_id, label="PS2FPKG"):
     region = REGIONS.get(title_id[2:3], "UP")
-    return f"{region}9000-{title_id}_00-{title_id}PS2FPKG"
-
-
-def validate_ids(title_id, content_id):
-    if not re.fullmatch(r"[A-Z]{4}\d{5}", title_id):
-        raise BuildError(f"TITLE_ID '{title_id}' inválido: deben ser 4 letras y 5 números (p. ej. SLUS20946).")
-    if not re.fullmatch(r"[A-Z]{2}\d{4}-[A-Z]{4}\d{5}_00-[A-Z0-9]{16}", content_id):
-        raise BuildError(f"CONTENT_ID '{content_id}' inválido: formato XX0000-XXXX00000_00-ZZZZZZZZZZZZZZZZ.")
-    if content_id[7:16] != title_id:
-        raise BuildError(f"El CONTENT_ID {content_id} no contiene el TITLE_ID {title_id}.")
+    return f"{region}9000-{title_id}_00-{title_id}{label}"
 
 
 def detect_serial(path):
     with iso.DiscImage(path) as disc:
         return iso.read_serial(disc)
-
-
-def _rid():
-    arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
-    return {"Windows": "win", "Darwin": "osx"}.get(platform.system(), "linux") + "-" + arch
-
-
-def find_pkgtool(explicit=""):
-    """Devuelve el comando (lista) para ejecutar PkgTool, o None."""
-    candidates = [explicit, os.environ.get("PS2FPKG_PKGTOOL", "")]
-    tools = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools")
-    for name in ("PkgTool.Core.exe", "PkgTool.Core", "PkgTool.exe", "PkgTool.Core.dll"):
-        candidates += [os.path.join(tools, _rid(), name), os.path.join(tools, name), shutil.which(name) or ""]
-    for c in candidates:
-        if c and os.path.isfile(c):
-            if c.lower().endswith(".dll"):
-                dotnet = shutil.which("dotnet")
-                if not dotnet:
-                    raise BuildError(f"{c} requiere .NET (dotnet) instalado.")
-                return [dotnet, c]
-            return [c]
-    if explicit:
-        raise BuildError(f"No se encontró PkgTool en {explicit}.")
-    return None
 
 
 def _quality_patches(opts, disc, serial, title, log):
@@ -165,34 +128,22 @@ def build(opts, log=print, progress=None):
 
         patch_lua, widescreen = _quality_patches(opts, discs[0], serial, title, log)
 
-        os.makedirs(opts.output_dir, exist_ok=True)
-        work = os.path.abspath(os.path.join(opts.output_dir, f"{content_id}_work"))
-        if os.path.exists(work):
-            shutil.rmtree(work)
-        os.makedirs(os.path.join(work, "sce_sys"))
-
-        files = emu.collect(base)
+        pkg = pkgbuild.Package(opts.output_dir, content_id)
+        pkg.files.update(emu.collect(base))
 
         for n, disc in enumerate(discs, 1):
             target = f"image/disc{n:02d}.iso"
             if disc.is_raw:
-                dst = os.path.join(work, f"disc{n:02d}.iso")
+                dst = pkg.path(target)
                 log(f"Disco {n}: imagen BIN de {disc.sector_size} bytes/sector, convirtiendo a ISO...")
                 disc.convert_to_iso(dst, progress)
-                files[target] = dst
+                pkg.add(target, dst)
             else:
-                files[target] = os.path.abspath(disc.path)
+                pkg.add(target, disc.path)
             log(f"Disco {n}: {os.path.basename(disc.path)} -> {target}")
     finally:
         for disc in discs:
             disc.close()
-
-    def write(rel, data):
-        dst = os.path.join(work, *rel.split("/"))
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        with open(dst, "wb") as f:
-            f.write(data)
-        files[rel] = dst
 
     # Configuración del emulador: perfil de calidad < configuración oficial del juego < argumentos del usuario.
     overrides = list(emu.QUALITY_PROFILES[opts.quality])
@@ -214,88 +165,25 @@ def build(opts, log=print, progress=None):
             log("Configuración oficial de Sony para este juego ✓")
     drop = set()
     if cli_conf:
-        write(f"patches/{serial}_cli.conf", cli_conf.encode("utf-8"))
+        pkg.write(f"patches/{serial}_cli.conf", cli_conf)
         # Lo que el juego ajusta en su configuración propia no se pisa desde el perfil general.
         drop = {emu.arg_key(a) for a in emu.parse_args(cli_conf)}
         overrides = [a for a in overrides if emu.arg_key(a) not in drop]
     if opts.config_lua:
         with open(opts.config_lua, "rb") as f:
-            write(f"patches/{serial}_config.lua", f.read())
+            pkg.write(f"patches/{serial}_config.lua", f.read())
     if cli_conf or opts.config_lua:
         overrides.append('--path-patches="/app0/patches"')
     if patch_lua:
-        write(f"feature_data/{serial}_features.lua", patch_lua.encode("utf-8"))
+        pkg.write(f"feature_data/{serial}_features.lua", patch_lua)
         overrides.append('--path-featuredata="/app0/feature_data"')
     overrides += opts.emu_args
 
     config = emu.make_config(base, serial, len(discs), overrides, drop)
-    write(emu.CONFIG_NAME, config.encode("utf-8"))
+    pkg.write(emu.CONFIG_NAME, config)
     log("config-emu-ps4.txt: " + "  ".join(a for a in emu.parse_args(config)
                                             if emu.arg_key(a).startswith(("--gs-", "--host-"))))
 
-    write("sce_sys/param.sfo", sfo.ps2_classic(title, title_id, content_id))
-
-    log("Generando imágenes del menú...")
-    for rel, size, src in (("sce_sys/icon0.png", images.ICON_SIZE, opts.icon),
-                           ("sce_sys/pic0.png", images.BG_SIZE, opts.background),
-                           ("sce_sys/pic1.png", images.BG_SIZE, opts.background)):
-        dst = os.path.join(work, *rel.split("/"))
-        images.make(dst, size, src or None, title=title)
-        files[rel] = dst
-
-    gp4_path = os.path.join(work, "project.gp4")
-    with open(gp4_path, "wb") as f:
-        f.write(gp4.build(content_id, files))
-    log(f"Proyecto GP4: {gp4_path} ({len(files)} archivos)")
-
-    if opts.gp4_only:
-        return gp4_path
-
-    cmd = find_pkgtool(opts.pkgtool)
-    if cmd is None:
-        raise BuildError(
-            "No se encontró PkgTool. Usa el incluido en tools/ o compílalo con "
-            f"'python tools/build_pkgtool.py'. El proyecto quedó listo en {gp4_path}."
-        )
-    out_dir = os.path.abspath(opts.output_dir)
-    pkg_path = os.path.join(out_dir, f"{content_id}.pkg")
-    if os.path.exists(pkg_path):
-        os.remove(pkg_path)
-    log("Creando el fPKG con PkgTool (puede tardar varios minutos)...")
-    output = _run(cmd + ["pkg_build", gp4_path, out_dir], log)
-    if "not allocated enough space" in output:
-        raise BuildError("Este PkgTool tiene el fallo de PlayGo con juegos grandes. Usa el PkgTool "
-                         "parcheado de tools/ (o compílalo con 'python tools/build_pkgtool.py').")
-    if not os.path.isfile(pkg_path):
-        raise BuildError(f"PkgTool no generó {pkg_path}. Archivos de trabajo en {work}.")
-
-    if opts.validate:
-        log("Verificando hashes y firmas del PKG...")
-        report = _run(cmd + ["pkg_validate", pkg_path], lambda _line: None)
-        errors = [ln for ln in report.splitlines() if ln.startswith("[ERROR]")]
-        if errors or "[OK]" not in report:
-            raise BuildError("El PKG no pasó la verificación:\n" + ("\n".join(errors) or report[-2000:]))
-        log(f"Verificación correcta ({report.count('[OK]')} comprobaciones).")
-
-    if not opts.keep_work:
-        shutil.rmtree(work, ignore_errors=True)
-    size = os.path.getsize(pkg_path)
-    log(f"Listo: {pkg_path} ({size / 1024 ** 3:.2f} GB)")
-    if size > FAT32_LIMIT:
-        log("Nota: pesa más de 4 GB. Para instalar por USB formatea la memoria en exFAT "
-            "(FAT32 no admite archivos tan grandes) o instálalo por red.")
-    return pkg_path
-
-
-def _run(cmd, log):
-    """Ejecuta un comando mostrando su salida; devuelve el texto completo."""
-    lines = []
-    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          text=True, errors="replace") as proc:
-        for line in proc.stdout:
-            lines.append(line)
-            log("  " + line.rstrip())
-    text = "".join(lines)
-    if proc.returncode != 0 and "not allocated enough space" not in text:
-        raise BuildError(f"PkgTool falló (código {proc.returncode}):\n{text[-2000:]}")
-    return text
+    return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background,
+                     pkgtool=opts.pkgtool, gp4_only=opts.gp4_only, keep_work=opts.keep_work,
+                     validate=opts.validate, log=log)

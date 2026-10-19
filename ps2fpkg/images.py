@@ -82,12 +82,13 @@ def _placeholder_pil(size, title, subtitle):
     return img
 
 
-def make(dst, size, source=None, title="", subtitle="PlayStation 2"):
-    """Crea un PNG del tamaño pedido a partir de `source` o un marcador con el título."""
+def make(dst, size, source=None, title="", subtitle="PlayStation 2", fit="cover"):
+    """Crea un PNG del tamaño pedido a partir de `source` o un marcador con el título.
+    fit="cover" llena el espacio recortando; "contain" muestra la imagen entera sobre un fondo."""
     if source:
         if Image is not None:
             img = Image.open(source).convert("RGB")
-            img = _cover(img, size)
+            img = _cover(img, size) if fit == "cover" else _contain(img, size)
             img.save(dst, "PNG")
             return
         if source.lower().endswith(".png") and png_size(source) == size:
@@ -112,3 +113,13 @@ def _cover(img, size):
     img = img.resize((max(tw, round(img.width * scale)), max(th, round(img.height * scale))), Image.LANCZOS)
     left, top = (img.width - tw) // 2, (img.height - th) // 2
     return img.crop((left, top, left + tw, top + th))
+
+
+def _contain(img, size):
+    """Escala la imagen entera dentro de `size`, centrada sobre el degradado."""
+    tw, th = size
+    scale = min(tw / img.width, th / img.height)
+    img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+    canvas = Image.open(io.BytesIO(_gradient(tw, th))).convert("RGB")
+    canvas.paste(img, ((tw - img.width) // 2, (th - img.height) // 2))
+    return canvas

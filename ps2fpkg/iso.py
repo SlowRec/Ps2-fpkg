@@ -66,7 +66,8 @@ class DiscImage:
         return bytes(out[:size])
 
     def _find_in_dir(self, lba, size, name):
-        """Busca `name` en un directorio; devuelve (lba, tamaño, es_directorio) o None."""
+        """Busca `name` en un directorio; devuelve (lba, tamaño, es_directorio, posición del
+        registro en el directorio) o None."""
         data = self.read_extent(lba, size)
         pos = 0
         while pos < len(data):
@@ -80,21 +81,29 @@ class DiscImage:
             if raw_name.split(";")[0].rstrip(".").upper() == name.upper():
                 return (struct.unpack_from("<I", data, pos + 2)[0],
                         struct.unpack_from("<I", data, pos + 10)[0],
-                        bool(data[pos + 25] & 2))
+                        bool(data[pos + 25] & 2), lba * SECTOR + pos)
             pos += rec_len
         return None
 
-    def find_file(self, path):
-        """Devuelve (lba, tamaño) de un archivo ('SYSTEM.CNF' o 'DATA\\SLUS_209.46'), o None."""
+    def find_record(self, path):
+        """Devuelve (lba, tamaño, posición del registro de directorio en la imagen ISO) de un
+        archivo ('SYSTEM.CNF' o 'DATA\\SLUS_209.46'), o None. La posición solo es válida en
+        imágenes ISO de 2048 bytes/sector."""
         root = self.read_sector(16)[156:190]
         lba, size = struct.unpack_from("<I", root, 2)[0], struct.unpack_from("<I", root, 10)[0]
         parts = [p for p in re.split(r"[\\/]", path) if p]
+        record = None
         for i, part in enumerate(parts):
             entry = self._find_in_dir(lba, size, part.split(";")[0])
             if entry is None or entry[2] != (i < len(parts) - 1):
                 return None
-            lba, size = entry[0], entry[1]
-        return lba, size
+            lba, size, record = entry[0], entry[1], entry[3]
+        return lba, size, record
+
+    def find_file(self, path):
+        """Devuelve (lba, tamaño) de un archivo, o None."""
+        entry = self.find_record(path)
+        return entry[:2] if entry else None
 
     def read_file(self, path):
         entry = self.find_file(path)
@@ -142,6 +151,16 @@ def read_serial(disc):
     if cnf is None:
         raise DiscError(f"{disc.path}: no contiene SYSTEM.CNF; ¿es un disco de PS2?")
     return parse_serial(cnf.decode("ascii", "replace"))
+
+
+PS1_SERIAL_RE = re.compile(r"BOOT\s*=\s*cdrom:\\?(?:[^\r\n;]*\\)?([A-Z]{4})[_-](\d{3})\.?(\d{2})", re.IGNORECASE)
+
+
+def read_ps1_serial(disc):
+    """Serial de un disco de PS1 (línea BOOT de SYSTEM.CNF), o None si no se puede leer."""
+    cnf = disc.read_file("SYSTEM.CNF")
+    m = PS1_SERIAL_RE.search(cnf.decode("ascii", "replace")) if cnf else None
+    return f"{m.group(1).upper()}-{m.group(2)}{m.group(3)}" if m else None
 
 
 def read_boot_elf(disc):

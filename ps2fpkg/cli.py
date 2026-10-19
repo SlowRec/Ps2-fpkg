@@ -1,21 +1,103 @@
 """Interfaz de línea de comandos.
 
-    python -m ps2fpkg JUEGO.iso -e EMULADOR [opciones]     convertir
-    python -m ps2fpkg instalar JUEGO.pkg --ps4 IP          instalar por red con GoldHEN
+    python -m ps2fpkg [ps2] JUEGO.iso -e EMULADOR [opciones]   PS2
+    python -m ps2fpkg ps1 JUEGO.cue -e EMULADOR [opciones]     PS1
+    python -m ps2fpkg psp JUEGO.iso -e EMULADOR [opciones]     PSP
+    python -m ps2fpkg nes JUEGO.nes [opciones]                 NES
+    python -m ps2fpkg snes JUEGO.sfc [opciones]                SNES
+    python -m ps2fpkg instalar JUEGO.pkg --ps4 IP              instalar por red con GoldHEN
 """
 
 import argparse
 import sys
 import time
 
-from . import builder, emu, install, iso
+from . import builder, cue, emu, install, iso, ps1, psp, retro
+
+SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes")
+
+
+def _common(p, emu_required=True, emu_help="carpeta del emulador (la app de PS4 extraída, con eboot.bin)"):
+    """Opciones compartidas por todas las consolas."""
+    p.add_argument("-e", "--emu", required=emu_required, default="", help=emu_help)
+    p.add_argument("-o", "--output", default=".", help="carpeta de salida (por defecto: la actual)")
+    p.add_argument("-t", "--title", default="", help="nombre que se mostrará en el menú de PS4")
+    p.add_argument("--title-id", default="", help="TITLE_ID del PKG (4 letras y 5 números)")
+    p.add_argument("--content-id", default="", help="CONTENT_ID del PKG (36 caracteres)")
+    p.add_argument("--icon", default="", help="imagen para el icono (se ajusta a 512x512)")
+    p.add_argument("--background", default="", help="imagen de fondo (se ajusta a 1920x1080)")
+    k = p.add_argument_group("empaquetado e instalación")
+    k.add_argument("--pkgtool", default="", help="ruta a PkgTool; por defecto el de tools/")
+    k.add_argument("--gp4-only", action="store_true", help="solo preparar el proyecto .gp4, sin crear el PKG")
+    k.add_argument("--keep-work", action="store_true", help="no borrar la carpeta de trabajo al terminar")
+    k.add_argument("--instalar-en", default="", metavar="IP_PS4",
+                   help="al terminar, enviarlo a la PS4 (Remote Package Installer abierto)")
+
+
+def parse_system(cmd, argv):
+    if cmd == "ps1":
+        p = argparse.ArgumentParser(prog="ps2fpkg ps1", description="Convierte un juego de PS1 (BIN/CUE) "
+                                    "en fPKG de PS4 con el emulador oficial de PS1 (PlayStation Plus).")
+        p.add_argument("discos", nargs="+", help=".cue (o .bin de una pista) de cada disco, en orden")
+        p.add_argument("--serial", default="", help="serial, p. ej. SLUS-00067 (por defecto se lee del disco)")
+        p.add_argument("-q", "--calidad", choices=list(ps1.QUALITY_PROFILES), default="maxima",
+                       help="maxima: resolución 6x (por defecto); alta: 4x; rendimiento: 2x; original: no toca la base")
+        p.add_argument("--sin-menu-graficos", dest="graphics_menu", action="store_false",
+                       help="no activar el menú Gráficos del emulador (filtro Lanczos y antialiasing en el juego)")
+        p.add_argument("--60hz", dest="force_60hz", action="store_true", help="forzar 60 Hz (juegos PAL)")
+        p.add_argument("--analogico", dest="analog", action="store_true", help="simular sticks analógicos")
+        p.add_argument("--sin-logo", dest="skip_bios_logo", action="store_true", help="saltar el logo de PlayStation")
+        p.add_argument("--config-lua", default="", help="script lua del juego")
+        p.add_argument("--emu-arg", action="append", default=[], metavar="--CLAVE=VALOR",
+                       help="línea extra para config-title.txt (repetible)")
+    elif cmd == "psp":
+        p = argparse.ArgumentParser(prog="ps2fpkg psp", description="Convierte un juego de PSP (ISO) "
+                                    "en fPKG de PS4 con el emulador oficial de PSP (PlayStation Plus).")
+        p.add_argument("iso", help="ISO del juego")
+        p.add_argument("--serial", default="", help="serial, p. ej. ULUS-10041 (por defecto se lee del UMD)")
+        p.add_argument("-q", "--calidad", choices=list(psp.QUALITY_PROFILES), default="maxima",
+                       help="maxima: antialiasing SSAA4x (por defecto); equilibrado: MSAA4x; "
+                            "rendimiento: sin antialiasing; original: no toca la base")
+        p.add_argument("--eboot-decrypt", default="", help="ruta a eboot_decrypt; por defecto el de tools/")
+        p.add_argument("--emu-arg", action="append", default=[], metavar="--CLAVE=VALOR",
+                       help="línea extra para config-title.txt (repetible)")
+    else:
+        system = retro.SYSTEMS[cmd]
+        p = argparse.ArgumentParser(prog=f"ps2fpkg {cmd}", description=f"Convierte una ROM de {system.name} "
+                                    "en fPKG de PS4 con pemu (incluido): cada juego arranca directo desde el menú.")
+        p.add_argument("rom", help="ROM del juego (" + ", ".join(system.extensions) + ")")
+        p.add_argument("-v", "--imagen", choices=list(retro.VIDEO_PROFILES), default="nitido",
+                       help="; ".join(f"{k}: {v}" for k, v in retro.VIDEO_LABELS.items()))
+        if cmd == "snes":
+            p.add_argument("--sin-sincronia-audio", dest="audio_sync", action="store_false",
+                           help="no sincronizar con el audio (puede dar chasquidos)")
+        p.add_argument("--mostrar-fps", dest="show_fps", action="store_true", help="mostrar los FPS")
+    _common(p, emu_required=cmd in ("ps1", "psp"),
+            emu_help="carpeta de un " + {"ps1": "PS1 Classic", "psp": "PSP Classic"}.get(cmd, "pemu propio (opcional)")
+            + " de PS4 extraído (con eboot.bin)")
+    return p.parse_args(argv)
+
+
+def system_options(cmd, a):
+    common = dict(output_dir=a.output, title=a.title, title_id=a.title_id, content_id=a.content_id,
+                  icon=a.icon, background=a.background, pkgtool=a.pkgtool, gp4_only=a.gp4_only,
+                  keep_work=a.keep_work, emu_dir=a.emu)
+    if cmd == "ps1":
+        return ps1, ps1.Options(discs=a.discos, serial=a.serial, quality=a.calidad, graphics_menu=a.graphics_menu,
+                                force_60hz=a.force_60hz, analog=a.analog, skip_bios_logo=a.skip_bios_logo,
+                                config_lua=a.config_lua, emu_args=a.emu_arg, **common)
+    if cmd == "psp":
+        return psp, psp.Options(iso=a.iso, serial=a.serial, quality=a.calidad, eboot_decrypt=a.eboot_decrypt,
+                                emu_args=a.emu_arg, **common)
+    return retro, retro.Options(system=cmd, rom=a.rom, video=a.imagen, audio_sync=getattr(a, "audio_sync", True),
+                                show_fps=a.show_fps, **common)
 
 
 def parse_convert(argv):
     p = argparse.ArgumentParser(
         prog="ps2fpkg",
-        description="Convierte ISOs de PS2 en fPKG de PS4 (PS2 Classics). "
-                    "Para instalar por red: 'ps2fpkg instalar --help'.",
+        description="Convierte ISOs de PS2 en fPKG de PS4 (PS2 Classics). Otras consolas: "
+                    "'ps2fpkg ps1|psp|nes|snes --help'. Instalar por red: 'ps2fpkg instalar --help'.",
     )
     p.add_argument("iso", nargs="+", help="ISO(s) del juego, en orden de disco (también acepta BIN de 2352 bytes/sector)")
     p.add_argument("-e", "--emu", required=True, help="carpeta extraída de un PS2 Classic de PS4 (la que tiene eboot.bin)")
@@ -72,6 +154,10 @@ def parse_install(argv):
     return p.parse_args(argv)
 
 
+def _progress(done, total):
+    print(f"\r  {done * 100 // max(1, total)}%", end="" if done < total else "\n", flush=True)
+
+
 def run_install(pkgs, ps4="", port=8000, host_ip=""):
     server, urls = install.serve(pkgs, port=port, host_ip=host_ip, ps4_ip=ps4)
     for url in urls.values():
@@ -96,6 +182,15 @@ def main(argv=None):
             a = parse_install(argv[1:])
             run_install(a.pkg, a.ps4, a.puerto, a.ip_pc)
             return 0
+        if argv and argv[0] in SYSTEM_COMMANDS and argv[0] != "ps2":
+            a = parse_system(argv[0], argv[1:])
+            module, opts = system_options(argv[0], a)
+            pkg = module.build(opts, progress=_progress)
+            if a.instalar_en and not a.gp4_only:
+                run_install([pkg], a.instalar_en)
+            return 0
+        if argv and argv[0] == "ps2":
+            argv = argv[1:]
         a = parse_convert(argv)
         opts = builder.Options(
             isos=a.iso, emu_dir=a.emu, output_dir=a.output, title=a.title, serial=a.serial,
@@ -107,13 +202,10 @@ def main(argv=None):
             keep_work=a.keep_work,
         )
 
-        def progress(done, total):
-            print(f"\r  {done * 100 // max(1, total)}%", end="" if done < total else "\n", flush=True)
-
-        pkg = builder.build(opts, progress=progress)
+        pkg = builder.build(opts, progress=_progress)
         if a.instalar_en and not a.gp4_only:
             run_install([pkg], a.instalar_en)
-    except (builder.BuildError, emu.EmuError, iso.DiscError, OSError, ValueError, RuntimeError) as e:
+    except (builder.BuildError, emu.EmuError, iso.DiscError, cue.CueError, OSError, ValueError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     return 0

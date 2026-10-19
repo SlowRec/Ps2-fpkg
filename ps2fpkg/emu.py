@@ -1,4 +1,5 @@
-"""Base del emulador: los archivos de un PS2 Classic oficial que el usuario extrajo de su propio PKG."""
+"""Base del emulador: la carpeta de la app de PS4 que hace de emulador (un PS Classic oficial
+que el usuario extrajo de su propio PKG, o pemu para NES/SNES), y sus archivos de opciones."""
 
 import os
 
@@ -6,8 +7,7 @@ CONFIG_NAME = "config-emu-ps4.txt"
 
 # Archivos de la base que no deben pasar al nuevo PKG: los regenera esta herramienta,
 # los genera PkgTool, o pertenecen al juego original (trofeos, licencias, disco).
-EXCLUDE_FILES = {
-    CONFIG_NAME,
+COMMON_EXCLUDE_FILES = {
     "sce_sys/param.sfo",
     "sce_sys/keystone",
     "sce_sys/nptitle.dat",
@@ -24,7 +24,7 @@ EXCLUDE_FILES = {
     "sce_sys/origin-param.sfo",
     "sce_sys/psreserved.dat",
 }
-EXCLUDE_DIRS = ("image/", "sce_sys/trophy/", "sce_sys/changeinfo/")
+COMMON_EXCLUDE_DIRS = ("sce_sys/trophy/", "sce_sys/changeinfo/")
 EXCLUDE_PREFIXES = ("sce_sys/playgo-",)
 
 
@@ -32,30 +32,40 @@ class EmuError(Exception):
     pass
 
 
-def locate(path):
+def locate(path, kind="PS2 Classic"):
     """Acepta la carpeta con eboot.bin o la carpeta de extracción que la contiene
     (PkgTool pkg_extract deja los archivos en uroot/; otras herramientas en Image0/)."""
+    if not path:
+        raise EmuError(f"Indica la carpeta del emulador base ({kind} de PS4 extraído).")
     for candidate in (path, *(os.path.join(path, sub) for sub in ("uroot", "Image0", "image0"))):
         if os.path.isfile(os.path.join(candidate, "eboot.bin")):
             return candidate
     raise EmuError(
-        f"{path}: no contiene eboot.bin. Indica la carpeta extraída de un PS2 Classic de PS4 "
-        "(la que tiene eboot.bin, ps2-emu-compiler.self, sce_sys/, etc.)."
+        f"{path}: no contiene eboot.bin. Indica la carpeta extraída de un {kind} de PS4 "
+        "(la que tiene eboot.bin, sce_module/, sce_sys/, etc.)."
     )
 
 
-def collect(base):
-    """Devuelve dict ruta_en_pkg -> ruta absoluta para los archivos que se copian de la base."""
+def collect_base(base, exclude_files=(), exclude_dirs=()):
+    """Devuelve dict ruta_en_pkg -> ruta absoluta para los archivos que se copian de la base,
+    sin los comunes a excluir ni los indicados (rutas en minúsculas; carpetas terminadas en /)."""
+    skip_files = COMMON_EXCLUDE_FILES | {f.lower() for f in exclude_files}
+    skip_dirs = COMMON_EXCLUDE_DIRS + tuple(d.lower() for d in exclude_dirs)
     files = {}
     for dirpath, _dirs, names in os.walk(base):
         for name in names:
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, base).replace(os.sep, "/")
             low = rel.lower()
-            if low in EXCLUDE_FILES or low.startswith(EXCLUDE_DIRS) or low.startswith(EXCLUDE_PREFIXES):
+            if low in skip_files or low.startswith(skip_dirs) or low.startswith(EXCLUDE_PREFIXES):
                 continue
             files[rel] = os.path.abspath(full)
     return files
+
+
+def collect(base):
+    """Archivos de una base de PS2 Classic (sin su disco ni su configuración)."""
+    return collect_base(base, {CONFIG_NAME}, ("image/",))
 
 
 EXECUTABLE_EXT = (".bin", ".self", ".sprx", ".prx")
@@ -106,18 +116,21 @@ def parse_args(text):
     return [ln.strip() for ln in text.splitlines() if ln.strip().startswith("--")]
 
 
-def make_config(base, serial, disc_count, overrides=(), drop=()):
-    """Copia config-emu-ps4.txt de la base fijando el serial y el número de discos, y aplica
-    `overrides` (líneas '--clave=valor', la última gana). Las claves de `drop` se quitan
-    (salvo que estén en overrides): sirve para que la configuración oficial del juego mande."""
-    path = os.path.join(base, CONFIG_NAME)
-    lines = []
-    if os.path.isfile(path):
-        with open(path, encoding="utf-8", errors="replace") as f:
-            lines = [ln.rstrip("\r\n") for ln in f]
+def read_lines(path):
+    if not os.path.isfile(path):
+        return []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return [ln.rstrip("\r\n") for ln in f]
 
+
+def merge_args(lines, overrides=(), drop=(), uncomment=(), extra=()):
+    """Aplica opciones '--clave=valor' sobre las líneas de un archivo de configuración.
+    `overrides`: reemplazan la línea con la misma clave (aunque esté comentada) o se añaden;
+    la última gana. `drop`: claves que se quitan (salvo que estén en overrides).
+    `uncomment`: claves comentadas que se activan. `extra`: líneas que se añaden tal cual
+    (para opciones que se repiten, como --image)."""
     wanted = {}
-    for arg in [f"--ps2-title-id={serial}", f"--max-disc-num={disc_count}", *overrides]:
+    for arg in overrides:
         wanted[arg_key(arg)] = arg.strip()
     out = []
     for ln in lines:
@@ -130,8 +143,19 @@ def make_config(base, serial, disc_count, overrides=(), drop=()):
             continue
         if key and not commented and key in drop:
             continue
-        if commented and disc_count > 1 and key == "--path-toolingscript":
-            ln = ln.strip().lstrip("#")  # el script de cambio de disco es necesario con varios discos
+        if commented and key in uncomment:
+            ln = ln.strip().lstrip("#")
         out.append(ln)
     out += [arg for arg in wanted.values() if arg is not None]
+    out += list(extra)
     return "\n".join(out) + "\n"
+
+
+def make_config(base, serial, disc_count, overrides=(), drop=()):
+    """Copia config-emu-ps4.txt de la base fijando el serial y el número de discos, y aplica
+    `overrides` (líneas '--clave=valor', la última gana). Las claves de `drop` se quitan
+    (salvo que estén en overrides): sirve para que la configuración oficial del juego mande.
+    Con varios discos activa el script de cambio de disco de la base."""
+    return merge_args(read_lines(os.path.join(base, CONFIG_NAME)),
+                      [f"--ps2-title-id={serial}", f"--max-disc-num={disc_count}", *overrides], drop,
+                      uncomment={"--path-toolingscript"} if disc_count > 1 else ())

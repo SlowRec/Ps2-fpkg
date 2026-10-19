@@ -1,3 +1,7 @@
-tools/win-x64/: PkgTool parcheado para Windows (incluido).
-Otros sistemas: python tools/build_pkgtool.py  (requiere git y .NET SDK 8)
-Se compila desde https://github.com/maxton/LibOrbisPkg (LGPL-3.0) con la corrección de PlayGo para juegos grandes.
+tools/win-x64/   PkgTool parcheado y eboot_decrypt para Windows (incluidos).
+tools/linux-x64/ eboot_decrypt para Linux (incluido). PkgTool: python tools/build_pkgtool.py
+
+Scripts para recompilar todo desde el código fuente:
+  build_pkgtool.py    PkgTool (LibOrbisPkg, LGPL-3.0) con la corrección de PlayGo para juegos grandes
+  build_pspdecrypt.py eboot_decrypt (PrxDecrypter de pspdecrypt, GPL-3.0) para juegos de PSP
+  build_pemu.py       emus/pnes.zip y emus/psnes.zip (pemu, GPL-3.0) con pemu-autoboot.patch

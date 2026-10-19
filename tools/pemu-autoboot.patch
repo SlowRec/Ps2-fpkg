@@ -1,0 +1,104 @@
+diff --git a/src/cores/main.cpp b/src/cores/main.cpp
+index 690c3a4..9bd8bff 100644
+--- a/src/cores/main.cpp
++++ b/src/cores/main.cpp
+@@ -4,8 +4,57 @@
+ 
+ #include "main.h"
+ 
++
+ using namespace c2d;
+ using namespace pemu;
++#if defined(__PS4__) && !defined(PEMU_AUTOBOOT)
++#define PEMU_AUTOBOOT
++#endif
++
++#ifdef PEMU_AUTOBOOT
++#include <fstream>
++#include <map>
++
++// ps2-fpkg: paquete de un solo juego. Si existe /app0/autoboot/rom.txt (nombre de la ROM
++// dentro de /app0/autoboot/), se carga directamente y al salir del juego se cierra la app.
++// /app0/autoboot/options.txt (CLAVE=VALOR) da los ajustes iniciales del juego; se aplican
++// solo la primera vez, después mandan los que el jugador cambie en el menú.
++#ifndef AUTOBOOT_DIR
++#define AUTOBOOT_DIR "/app0/autoboot/"
++#endif
++
++static std::string autobootRom() {
++    std::ifstream f(AUTOBOOT_DIR "rom.txt");
++    std::string name;
++    if (!f || !std::getline(f, name)) return {};
++    while (!name.empty() && (name.back() == '\r' || name.back() == '\n' || name.back() == ' ')) name.pop_back();
++    return name.empty() ? std::string() : std::string(AUTOBOOT_DIR) + name;
++}
++
++static void autobootDefaults(PEMUConfig *cfg) {
++    static const std::map<std::string, int> ids = {
++        {"SCALING", PEMUConfig::EMU_SCALING},
++        {"SCALING_MODE", PEMUConfig::EMU_SCALING_MODE},
++        {"FILTER", PEMUConfig::EMU_FILTER},
++        {"EFFECT", PEMUConfig::EMU_SHADER},
++        {"AUDIO_SYNC", PEMUConfig::EMU_AUDIO_SYNC},
++        {"SHOW_FPS", PEMUConfig::EMU_SHOW_FPS},
++    };
++    std::ifstream f(AUTOBOOT_DIR "options.txt");
++    std::string line;
++    while (f && std::getline(f, line)) {
++        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
++        const auto eq = line.find('=');
++        if (eq == std::string::npos) continue;
++        const auto id = ids.find(line.substr(0, eq));
++        if (id == ids.end()) continue;
++        if (auto *opt = cfg->get(id->second, true)) {
++            opt->setArrayIndex(line.substr(eq + 1));
++        }
++    }
++    cfg->saveGame();
++}
++#endif
+ 
+ PEMUUiMain *pemu_ui;
+ 
+@@ -43,13 +92,21 @@ int main(int argc, char **argv) {
+     pemu_ui->setSkin(skin);
+ 
+     // parse command line
+-    if (argc > 1) {
+-        if (io->exist(argv[1])) {
+-            game.path = Utility::baseName(argv[1]);
++    std::string romArg = argc > 1 ? argv[1] : "";
++#ifdef PEMU_AUTOBOOT
++    bool autoboot = false;
++    if (romArg.empty()) {
++        romArg = autobootRom();
++        autoboot = !romArg.empty();
++    }
++#endif
++    if (!romArg.empty()) {
++        if (io->exist(romArg)) {
++            game.path = Utility::baseName(romArg);
+             game.name = Utility::removeExt(game.path);
+-            game.romsPath = Utility::remove(argv[1], game.path);
++            game.romsPath = Utility::remove(romArg, game.path);
+         } else {
+-            printf("main: file provided as console argument does not exist (%s)\n", argv[1]);
++            printf("main: file provided as console argument does not exist (%s)\n", romArg.c_str());
+             delete (skin);
+             delete (cfg);
+             delete (pemu_ui);
+@@ -75,7 +132,14 @@ int main(int argc, char **argv) {
+     if (!game.path.empty()) {
+         uiRomList->setVisibility(Visibility::Hidden);
+         uiRomList->setGames({game});
++#ifdef PEMU_AUTOBOOT
++        const bool firstRun = autoboot && !io->exist(
++            io->getDataPath() + "configs/" + Utility::removeExt(game.path) + ".cfg");
++#endif
+         cfg->loadGame(game);
++#ifdef PEMU_AUTOBOOT
++        if (firstRun) autobootDefaults(cfg);
++#endif
+         uiEmu->setExitOnStop(true);
+         uiEmu->load(game);
+     }
