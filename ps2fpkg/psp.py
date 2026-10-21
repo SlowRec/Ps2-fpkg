@@ -112,7 +112,7 @@ def build(opts, log=print, progress=None):
         raise BuildError(f"Perfil de calidad desconocido: {opts.quality}.")
     tool = pkgbuild.find_tool(("eboot_decrypt.exe", "eboot_decrypt"), opts.eboot_decrypt)
 
-    base = emu.locate(opts.emu_dir, "PSP Classic (PlayStation Plus)")
+    base = emu.locate(opts.emu_dir, "PSP Classic (PlayStation Plus)", "psp")
     files = emu.collect_base(base, {CONFIG_NAME})
     files = {k: v for k, v in files.items()
              if not (k.lower().startswith("data/") and k.lower().endswith((".img", ".iso", ".cso")))}

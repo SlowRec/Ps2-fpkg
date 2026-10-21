@@ -74,7 +74,7 @@ def build(opts, log=print, progress=None):
         if path.lower().endswith((".iso", ".chd", ".pbp", ".ecm")):
             raise BuildError(f"{os.path.basename(path)}: el emulador de PS1 necesita la imagen en bruto BIN/CUE.")
 
-    base = emu.locate(opts.emu_dir, "PS1 Classic (PlayStation Plus)")
+    base = emu.locate(opts.emu_dir, "PS1 Classic (PlayStation Plus)", "ps1")
     files = emu.collect_base(base, {CONFIG_NAME}, ("scripts/",))
     # El disco del juego original vive en data/: se descarta (lo demás de data/ se conserva).
     files = {k: v for k, v in files.items() if not (k.lower().startswith("data/") and k.lower().endswith(DISC_EXT))}

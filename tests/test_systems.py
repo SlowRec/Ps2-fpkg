@@ -122,6 +122,24 @@ class Ps1Tests(Base):
         self.assertIn("--ps1-title-id=SLUS00067", config)
         self.assertIn("scripts/SLUS00067.lua", files)
 
+    def test_uses_saved_emulator_without_asking(self):
+        original = emu.app_dir
+        app = os.path.join(self.dir, "app")
+        emu.app_dir = lambda: app
+        try:
+            with self.assertRaisesRegex(emu.EmuError, "una sola vez"):
+                ps1.build(ps1.Options(discs=[self.cue], emu_dir="", output_dir=self.out, gp4_only=True),
+                          log=lambda m: None)
+            emu.prepare_default_dirs()
+            self.assertTrue(os.path.isfile(os.path.join(app, "emuladores", "LEEME.txt")))
+            import shutil
+            shutil.copytree(self.base, os.path.join(app, "emuladores", "ps1", "uroot"))
+            gp4 = ps1.build(ps1.Options(discs=[self.cue], emu_dir="", output_dir=self.out, gp4_only=True),
+                            log=lambda m: None)
+            self.assertIn("data/bios.dat", gp4_files(gp4))
+        finally:
+            emu.app_dir = original
+
     def test_rejects_iso(self):
         with self.assertRaises(pkgbuild.BuildError):
             ps1.build(ps1.Options(discs=["juego.iso"], emu_dir=self.base, output_dir=self.out))

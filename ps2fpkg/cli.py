@@ -80,9 +80,9 @@ def parse_system(cmd, argv):
             p.add_argument("--sin-sincronia-audio", dest="audio_sync", action="store_false",
                            help="no sincronizar con el audio (puede dar chasquidos)")
         p.add_argument("--mostrar-fps", dest="show_fps", action="store_true", help="mostrar los FPS")
-    _common(p, emu_required=cmd in ("ps1", "psp"),
-            emu_help="carpeta de un " + {"ps1": "PS1 Classic", "psp": "PSP Classic"}.get(cmd, "pemu propio (opcional)")
-            + " de PS4 extraído (con eboot.bin)")
+    _common(p, emu_required=False,
+            emu_help=("carpeta de un " + {"ps1": "PS1 Classic", "psp": "PSP Classic"}[cmd] + " de PS4 extraído; "
+                      f"por defecto la de emuladores/{cmd}") if cmd in ("ps1", "psp") else "pemu propio (opcional)")
     return p.parse_args(argv)
 
 
@@ -108,7 +108,8 @@ def parse_convert(argv):
                     "'ps2fpkg ps1|psp|nes|snes --help'. Instalar por red: 'ps2fpkg instalar --help'.",
     )
     p.add_argument("iso", nargs="+", help="ISO(s) del juego, en orden de disco (también acepta BIN de 2352 bytes/sector)")
-    p.add_argument("-e", "--emu", required=True, help="carpeta extraída de un PS2 Classic de PS4 (la que tiene eboot.bin)")
+    p.add_argument("-e", "--emu", default="",
+                   help="carpeta del emulador (PS2 Classic de PS4 extraído); por defecto la de emuladores/ps2")
     p.add_argument("-o", "--output", default=".", help="carpeta de salida (por defecto: la actual)")
     p.add_argument("-t", "--title", default="", help="nombre que se mostrará en el menú de PS4")
     p.add_argument("--serial", default="", help="serial del juego, p. ej. SLUS-20946 (por defecto se lee del disco)")

@@ -2,6 +2,7 @@
 que el usuario extrajo de su propio PKG, o pemu para NES/SNES), y sus archivos de opciones."""
 
 import os
+import sys
 
 CONFIG_NAME = "config-emu-ps4.txt"
 
@@ -32,11 +33,63 @@ class EmuError(Exception):
     pass
 
 
-def locate(path, kind="PS2 Classic"):
+SYSTEM_NAMES = {"ps2": "PS2", "ps1": "PS1", "psp": "PSP"}
+
+
+def app_dir():
+    """Carpeta de la app: la del .exe, o la raíz del proyecto si se ejecuta desde el código."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def default_base_dirs(system):
+    """Dónde se busca solo el emulador de cada consola (para no tener que indicarlo nunca)."""
+    return [os.path.join(app_dir(), "emuladores", system),
+            os.path.join(os.path.expanduser("~"), ".ps2fpkg", "emuladores", system)]
+
+
+def find_base(system):
+    """Carpeta del emulador encontrada en las ubicaciones fijas, o None."""
+    for folder in default_base_dirs(system):
+        try:
+            return locate(folder)
+        except EmuError:
+            continue
+    return None
+
+
+def prepare_default_dirs():
+    """Crea emuladores/ps2, ps1 y psp junto a la app (si se puede), con instrucciones."""
+    root = os.path.join(app_dir(), "emuladores")
+    try:
+        for system in SYSTEM_NAMES:
+            os.makedirs(os.path.join(root, system), exist_ok=True)
+        readme = os.path.join(root, "LEEME.txt")
+        if not os.path.exists(readme):
+            with open(readme, "w", encoding="utf-8") as f:
+                f.write("Copia aquí, una sola vez, la carpeta de cada emulador (la que tiene eboot.bin):\n"
+                        "  ps2\\  -> de un PS2 Classic de PS4\n"
+                        "  ps1\\  -> de un PS1 Classic de PS4 (PlayStation Plus)\n"
+                        "  psp\\  -> de un PSP Classic de PS4 (PlayStation Plus)\n"
+                        "La app los usa sola y no vuelve a pedirlos. NES y SNES no necesitan nada.\n")
+    except OSError:
+        pass
+    return root
+
+
+def locate(path, kind="PS2 Classic", system=None):
     """Acepta la carpeta con eboot.bin o la carpeta de extracción que la contiene
-    (PkgTool pkg_extract deja los archivos en uroot/; otras herramientas en Image0/)."""
+    (PkgTool pkg_extract deja los archivos en uroot/; otras herramientas en Image0/).
+    Sin `path`, usa el emulador guardado en emuladores/<system> junto a la app."""
     if not path:
-        raise EmuError(f"Indica la carpeta del emulador base ({kind} de PS4 extraído).")
+        found = find_base(system) if system else None
+        if found:
+            return found
+        where = default_base_dirs(system)[0] if system else "la carpeta emuladores junto a la app"
+        raise EmuError(f"Falta el emulador de {SYSTEM_NAMES.get(system, kind)}. Copia una sola vez la carpeta "
+                       f"de un {kind} de PS4 (la que tiene eboot.bin) en:\n{where}\n"
+                       "Desde entonces la app la usará sola, sin volver a pedirla.")
     for candidate in (path, *(os.path.join(path, sub) for sub in ("uroot", "Image0", "image0"))):
         if os.path.isfile(os.path.join(candidate, "eboot.bin")):
             return candidate

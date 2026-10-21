@@ -8,7 +8,10 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__, builder, covers, images, install, ps1, psp, retro
+import subprocess
+import sys
+
+from . import __version__, builder, covers, emu, images, install, ps1, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -67,7 +70,7 @@ def _retro_options(system):
 
 SPECS = [
     (Spec("ps2", "PS2", "Discos (ISO/BIN, en orden)", [("Imágenes de disco", "*.iso *.bin *.img"), ("Todos", "*")],
-          True, "Emulador PS2 Classic", builder.detect_serial,
+          True, "emulador de un PS2 Classic de PS4", builder.detect_serial,
           {"Máxima (2x resolución + suavizado)": "maxima", "Rendimiento (resolución nativa + suavizado)": "rendimiento",
            "Original (no tocar el emulador)": "original"}, "Perfil",
           (("widescreen", "Pantalla 16:9", True), ("no_interlace", "Sin entrelazado", True),
@@ -76,13 +79,13 @@ SPECS = [
           (("config_lua", "Parche .lua", [("Lua", "*.lua"), ("Todos", "*")]),
            ("cli_conf", "CLI .conf", [("Conf", "*.conf"), ("Todos", "*")])), True), _ps2_options),
     (Spec("ps1", "PS1", "Discos (.cue o .bin, en orden)", [("PS1 BIN/CUE", "*.cue *.bin"), ("Todos", "*")],
-          True, "Emulador PS1 Classic", ps1.detect_serial,
+          True, "emulador de un PS1 Classic de PS4", ps1.detect_serial,
           {"Máxima (resolución 6x)": "maxima", "Alta (resolución 4x)": "alta",
            "Rendimiento (resolución 2x)": "rendimiento", "Original (no tocar el emulador)": "original"}, "Perfil",
           (("graphics_menu", "Menú Gráficos en el juego (Lanczos, AA)", True), ("force_60hz", "Forzar 60 Hz (PAL)", False),
            ("analog", "Simular sticks analógicos", False), ("skip_bios_logo", "Saltar logo de PlayStation", False)),
           (("config_lua", "Script .lua", [("Lua", "*.lua"), ("Todos", "*")]),), True), _ps1_options),
-    (Spec("psp", "PSP", "Juego (ISO)", [("PSP ISO", "*.iso"), ("Todos", "*")], False, "Emulador PSP Classic",
+    (Spec("psp", "PSP", "Juego (ISO)", [("PSP ISO", "*.iso"), ("Todos", "*")], False, "emulador de un PSP Classic de PS4",
           psp.detect_serial,
           {"Máxima (antialiasing SSAA 4x)": "maxima", "Equilibrado (MSAA 4x)": "equilibrado",
            "Rendimiento (sin antialiasing)": "rendimiento", "Original (no tocar el emulador)": "original"},
@@ -163,7 +166,16 @@ class SystemTab(ttk.Frame):
             self._field(row, "Serial (auto)", "serial")
             row += 1
         if s.emu_label:
-            self._field(row, s.emu_label, "emu_dir", lambda: self._pick_dir("emu_dir"))
+            # El emulador se configura una sola vez (carpeta emuladores/<consola> junto a la app):
+            # aquí solo se muestra si está listo, sin pedirlo en cada conversión.
+            ttk.Label(self, text="Emulador").grid(row=row, column=0, sticky="w", pady=2)
+            self.emu_status = ttk.Label(self, text="")
+            self.emu_status.grid(row=row, column=1, sticky="w", pady=2)
+            buttons = ttk.Frame(self)
+            buttons.grid(row=row, column=2, columnspan=2, sticky="w", padx=(6, 0))
+            ttk.Button(buttons, text="Abrir carpeta", command=self._open_emu_dir).grid(row=0, column=0)
+            ttk.Button(buttons, text="Otra…", width=6, command=self._pick_emu).grid(row=0, column=1, padx=(4, 0))
+            self.refresh_emu()
             row += 1
         self._field(row, "Carátula", "cover", lambda: self._pick_file("cover", IMAGES))
         ttk.Button(self, text="Buscar", command=self.search_cover).grid(row=row, column=3, padx=(6, 0))
@@ -205,6 +217,46 @@ class SystemTab(ttk.Frame):
         path = filedialog.askdirectory(initialdir=self.vars[key].get() or None)
         if path:
             self.vars[key].set(path)
+
+    # --- Emulador (se configura una vez) --------------------------------
+    def emu_base(self):
+        """Carpeta del emulador a usar (la elegida o la encontrada sola), o None."""
+        chosen = self.vars["emu_dir"].get().strip()
+        if chosen:
+            try:
+                return emu.locate(chosen)
+            except emu.EmuError:
+                pass
+        return emu.find_base(self.spec.key)
+
+    def refresh_emu(self):
+        base = self.emu_base()
+        if base:
+            self.emu_status.configure(text=f"✓ Listo ({base})", foreground="#1a7f37")
+        else:
+            folder = emu.default_base_dirs(self.spec.key)[0]
+            self.emu_status.configure(text=f"Falta: cópialo una sola vez en {folder}", foreground="#b42318")
+
+    def _open_emu_dir(self):
+        folder = emu.default_base_dirs(self.spec.key)[0]
+        os.makedirs(folder, exist_ok=True)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(folder)  # noqa: S606 — abre el Explorador de Windows
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder])
+        except OSError:
+            messagebox.showinfo("Carpeta del emulador", folder)
+        messagebox.showinfo("Emulador", f"Copia en esta carpeta, una sola vez, el contenido del {self.spec.emu_label} "
+                                        f"(la carpeta que tiene eboot.bin):\n{folder}\n\nDespués la app lo usará sola.")
+        self.refresh_emu()
+
+    def _pick_emu(self):
+        path = filedialog.askdirectory(initialdir=self.vars["emu_dir"].get() or None)
+        if path:
+            self.vars["emu_dir"].set(path)
+            self.refresh_emu()
+            self.app.remember()
 
     def _pick_file(self, key, types):
         path = filedialog.askopenfilename(filetypes=types)
@@ -313,8 +365,14 @@ class SystemTab(ttk.Frame):
         if not files:
             raise ValueError("Elige el juego primero.")
         v = {k: var.get().strip() for k, var in self.vars.items()}
-        if self.spec.emu_label and not v["emu_dir"]:
-            raise ValueError(f"Indica la carpeta del {self.spec.emu_label.lower()} (extraído de tu PS4).")
+        if self.spec.emu_label:
+            base = self.emu_base()
+            if base is None:
+                self.refresh_emu()
+                raise ValueError(f"Falta el emulador. Usa «Abrir carpeta» y copia ahí, una sola vez, el "
+                                 f"{self.spec.emu_label} (la carpeta con eboot.bin):\n"
+                                 f"{emu.default_base_dirs(self.spec.key)[0]}")
+            v["emu_dir"] = base
         v.update(shared)
         v["output_dir"] = shared["output_dir"] or os.path.dirname(files[0])
         args = []
@@ -332,6 +390,7 @@ class App(ttk.Frame):
         self.worker = None
         self.server = None
         self.settings = _load_settings()
+        emu.prepare_default_dirs()
         self.vars = {name: tk.StringVar(value=self.settings.get(name, "")) for name in SHARED}
         self.gp4_only = tk.BooleanVar(value=False)
         self.send_after = tk.BooleanVar(value=False)
@@ -403,7 +462,7 @@ class App(ttk.Frame):
         index = self.notebook.index(self.notebook.select())
         return self.tabs[index] if index < len(self.tabs) else None
 
-    def _remember(self, tab=None):
+    def remember(self, tab=None):
         data = dict(self.settings)
         data.update({k: self.vars[k].get().strip() for k in SHARED})
         for t in self.tabs:
@@ -432,7 +491,7 @@ class App(ttk.Frame):
         except ValueError as e:
             messagebox.showwarning("Faltan datos", str(e))
             return
-        self._remember(tab)
+        self.remember(tab)
         send_to = shared["ps4_ip"] if self.send_after.get() and not self.gp4_only.get() else ""
         self._run_in_background(self._build, module, opts, send_to)
 
@@ -443,7 +502,7 @@ class App(ttk.Frame):
             return
         pkg = filedialog.askopenfilename(filetypes=[("Paquetes PS4", "*.pkg"), ("Todos", "*")])
         if pkg:
-            self._remember()
+            self.remember()
             self._run_in_background(self._send, pkg, ip)
 
     def _run_in_background(self, target, *args):

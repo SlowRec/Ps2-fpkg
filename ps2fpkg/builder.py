@@ -110,7 +110,7 @@ def build(opts, log=print, progress=None):
     if opts.quality not in emu.QUALITY_PROFILES:
         raise BuildError(f"Perfil de calidad desconocido: {opts.quality}.")
 
-    base = emu.locate(opts.emu_dir)
+    base = emu.locate(opts.emu_dir, system="ps2")
     for w in emu.warnings(base):
         log(f"Aviso: {w}")
 

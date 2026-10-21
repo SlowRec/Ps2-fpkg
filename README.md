@@ -109,11 +109,23 @@ con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno,
    > El PkgTool original de LibOrbisPkg **falla con muchos juegos grandes** (“Playgo Chunk hash
    > file was not allocated enough space”), según el tamaño exacto del juego y de las imágenes.
    > El incluido calcula ese tamaño de forma exacta.
-4. **Emulador base** (solo PS1, PS2 y PSP): la carpeta de un clásico de PS4 de esa consola
-   (la que contiene `eboot.bin`, `sce_module/`, `sce_sys/`, …). Puedes obtenerla volcando el
-   juego instalado en tu PS4 con un *dumper* de aplicaciones, o extrayendo un fPKG que ya tengas:
+4. **Emulador** (solo PS1, PS2 y PSP), **una sola vez**: los emuladores de estas consolas son
+   de Sony y no se pueden incluir en la app. Copia la carpeta de un clásico de PS4 de esa consola
+   (la que contiene `eboot.bin`, `sce_module/`, `sce_sys/`, …) en la carpeta `emuladores` que la
+   app crea junto al .exe:
+
+   ```
+   emuladores\ps2\   ← PS2 Classic
+   emuladores\ps1\   ← PS1 Classic (PlayStation Plus)
+   emuladores\psp\   ← PSP Classic (PlayStation Plus)
+   ```
+
+   Desde entonces la app los usa sola y no los vuelve a pedir (cada pestaña muestra
+   «✓ Listo» o el botón **Abrir carpeta**). NES y SNES no necesitan nada.
+   Para obtener la carpeta: vuelca el juego instalado en tu PS4 con un *dumper* de aplicaciones,
+   o extrae un fPKG que ya tengas:
    `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`
-   (los archivos quedan en `carpeta/uroot/`; puedes indicar `carpeta` directamente).
+   (puedes copiar `carpeta` completa; la app encuentra `uroot/` sola).
    - PS2: las bases más usadas son las de *Jak and Daxter*, *Rogue Galaxy* y *Kinetica*.
    - PS1 y PSP: cualquier clásico de PlayStation Plus de esa consola.
    - Si la app avisa de que los ejecutables son **ELF sin firmar**, fírmalos como fSELF
@@ -136,20 +148,20 @@ todas las pruebas en Windows, crea un PKG de prueba con el propio .exe y lo veri
 Con el .exe: doble clic. Desde el código: `PS2-fPKG.bat` en Windows o `python -m ps2fpkg`.
 
 1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES).
-2. Agrega el juego (el serial, el nombre y la carátula se detectan solos) y, en PS1/PS2/PSP,
-   el **emulador base**. Cambia el nombre o la carátula si quieres.
+2. Agrega el juego (el serial, el nombre y la carátula se detectan solos). Cambia el nombre o
+   la carátula si quieres. En PS1/PS2/PSP el emulador ya no se pide: se usa el de `emuladores\`.
 3. Revisa **Calidad de imagen y sonido** (ya viene en máxima).
 4. Para instalar por red, escribe la **IP de la PS4** y marca **Enviar a la PS4 al terminar**.
 5. **Crear fPKG**.
 
-La app recuerda la carpeta de salida, la IP de la PS4 y el emulador base de cada consola.
+La app recuerda la carpeta de salida y la IP de la PS4; los emuladores se toman solos de `emuladores\`.
 
 ## Uso por línea de comandos
 
 ```
-python -m ps2fpkg "Jak and Daxter.iso" -e base_ps2 -o salida -t "Jak and Daxter"
-python -m ps2fpkg ps1 "Crash Bandicoot.cue" -e base_ps1 -o salida
-python -m ps2fpkg psp "LocoRoco.iso" -e base_psp -o salida
+python -m ps2fpkg "Jak and Daxter.iso" -o salida -t "Jak and Daxter"
+python -m ps2fpkg ps1 "Crash Bandicoot.cue" -o salida
+python -m ps2fpkg psp "LocoRoco.iso" -o salida
 python -m ps2fpkg nes "Super Mario Bros. (World).nes" -o salida
 python -m ps2fpkg snes "Super Metroid (USA).sfc" -o salida --imagen crt --instalar-en 192.168.1.50
 python -m ps2fpkg nes "zelda.nes" -t "Zelda (mi copia)" --caratula portada.jpg
