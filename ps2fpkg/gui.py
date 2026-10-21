@@ -6,12 +6,12 @@ import os
 import queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import subprocess
 import sys
 
-from . import __version__, builder, covers, dreamcast, emu, gamecube, images, install, ps1, psp, retro
+from . import __version__, builder, covers, dreamcast, emu, gamecube, images, install, ps1, ps4ftp, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -213,8 +213,9 @@ class SystemTab(ttk.Frame):
             self.emu_status.grid(row=row, column=1, sticky="w", pady=2)
             buttons = ttk.Frame(self)
             buttons.grid(row=row, column=2, columnspan=2, sticky="w", padx=(6, 0))
-            ttk.Button(buttons, text="Abrir carpeta", command=self._open_emu_dir).grid(row=0, column=0)
-            ttk.Button(buttons, text="Otra…", width=6, command=self._pick_emu).grid(row=0, column=1, padx=(4, 0))
+            ttk.Button(buttons, text="Traer de mi PS4", command=self._fetch_emu).grid(row=0, column=0)
+            ttk.Button(buttons, text="Abrir carpeta", command=self._open_emu_dir).grid(row=0, column=1, padx=(4, 0))
+            ttk.Button(buttons, text="Otra…", width=6, command=self._pick_emu).grid(row=0, column=2, padx=(4, 0))
             self.refresh_emu()
             row += 1
         self._field(row, "Carátula", "cover", lambda: self._pick_file("cover", IMAGES))
@@ -274,10 +275,17 @@ class SystemTab(ttk.Frame):
     def refresh_emu(self):
         base = self.emu_base()
         if base:
-            self.emu_status.configure(text=f"✓ Listo ({base})", foreground="#1a7f37")
+            try:
+                shown = os.path.relpath(base, emu.app_dir())
+            except ValueError:  # otra unidad en Windows
+                shown = base
+            if shown.startswith(".."):
+                shown = base
+            if len(shown) > 50:
+                shown = "…" + shown[-49:]
+            self.emu_status.configure(text=f"✓ Listo ({shown})", foreground="#1a7f37")
         else:
-            folder = emu.default_base_dirs(self.spec.key)[0]
-            self.emu_status.configure(text=f"Falta: cópialo una sola vez en {folder}", foreground="#b42318")
+            self.emu_status.configure(text="Falta: usa «Traer de mi PS4» (una sola vez)", foreground="#b42318")
 
     def _open_emu_dir(self):
         folder = emu.default_base_dirs(self.spec.key)[0]
@@ -292,6 +300,37 @@ class SystemTab(ttk.Frame):
         messagebox.showinfo("Emulador", f"Copia en esta carpeta, una sola vez, el contenido del {self.spec.emu_label} "
                                         f"(la carpeta que tiene eboot.bin):\n{folder}\n\nDespués la app lo usará sola.")
         self.refresh_emu()
+
+    def _fetch_emu(self):
+        """Copia el emulador desde la PS4 por el FTP de GoldHEN (ps4ftp.py)."""
+        name = emu.SYSTEM_NAMES[self.spec.key]
+        if not messagebox.askokcancel(
+                "Traer el emulador de tu PS4",
+                f"En la PS4:\n"
+                f"1. Activa el FTP de GoldHEN (Ajustes → GoldHEN → Servidor FTP).\n"
+                f"2. Abre un clásico de {name} que tengas instalado y déjalo abierto.\n\n"
+                f"La app copiará su emulador (sin el juego) a la carpeta emuladores\\{self.spec.key}. "
+                "Tarda uno o dos minutos. ¿Continuar?"):
+            return
+        ip = self.app.vars["ps4_ip"].get().strip() or (simpledialog.askstring(
+            "IP de la PS4", "IP de la PS4 (Ajustes → Red → Ver estado de la conexión):") or "").strip()
+        if not ip:
+            return
+        self.app.vars["ps4_ip"].set(ip)
+        self.app.remember()
+
+        def work():
+            try:
+                system, dest = ps4ftp.fetch(ip, self.spec.key, log=self.app.log_threadsafe)
+                for tab in self.app.tabs:
+                    if tab.spec.key == system:
+                        self.app.events.put(("call", tab.refresh_emu))
+                self.app.events.put(("done", f"Emulador de {emu.SYSTEM_NAMES[system]} listo:\n{dest}\n\n"
+                                             "Ya puedes cerrar el juego en la PS4."))
+            except Exception as e:  # noqa: BLE001 — se muestra al usuario
+                self.app.events.put(("error", str(e)))
+
+        self.app._run_in_background(work)
 
     def _pick_emu(self):
         path = filedialog.askdirectory(initialdir=self.vars["emu_dir"].get() or None)
@@ -413,8 +452,9 @@ class SystemTab(ttk.Frame):
             base = self.emu_base()
             if base is None:
                 self.refresh_emu()
-                raise ValueError(f"Falta el emulador. Usa «Abrir carpeta» y copia ahí, una sola vez, el "
-                                 f"{self.spec.emu_label} (la carpeta con eboot.bin):\n"
+                raise ValueError(f"Falta el emulador. Usa «Traer de mi PS4» con un clásico de "
+                                 f"{emu.SYSTEM_NAMES[self.spec.key]} abierto en la PS4, o copia el "
+                                 f"{self.spec.emu_label} (la carpeta con eboot.bin) en:\n"
                                  f"{emu.default_base_dirs(self.spec.key)[0]}")
             v["emu_dir"] = base
         v.update(shared)

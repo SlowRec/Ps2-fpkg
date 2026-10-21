@@ -8,9 +8,9 @@ con **GoldHEN** (por USB o directamente por la red).
 
 | Consola | Emulador en la PS4 | Entrada | Lo que aporta tu PC |
 | --- | --- | --- | --- |
-| PS2 | oficial de Sony (PS2 Classics) | `.iso` o `.bin` | la carpeta de un PS2 Classic que tengas |
-| PS1 | oficial de Sony (PS1HD, PlayStation Plus) | `.cue` + `.bin` | la carpeta de un PS1 Classic que tengas |
-| PSP | oficial de Sony (PSPHD, PlayStation Plus) | `.iso` | la carpeta de un PSP Classic que tengas |
+| PS2 | oficial de Sony (PS2 Classics) | `.iso` o `.bin` | un PS2 Classic instalado en tu PS4: la app trae el emulador |
+| PS1 | oficial de Sony (PS1HD, PlayStation Plus) | `.cue` + `.bin` | un clásico de PS1 instalado en tu PS4: la app trae el emulador |
+| PSP | oficial de Sony (PSPHD, PlayStation Plus) | `.iso` | un clásico de PSP instalado en tu PS4: la app trae el emulador |
 | NES | pNES (Nestopia) — **incluido** | `.nes`, `.fds`, `.zip` | nada más |
 | SNES | pSNES (Snes9x) — **incluido** | `.sfc`, `.smc`, `.zip` | nada más |
 | GBA | pGBA (mGBA) — **incluido** | `.gba`, `.gb`, `.gbc`, `.zip` | nada más (también Game Boy y Game Boy Color) |
@@ -20,7 +20,7 @@ con **GoldHEN** (por USB o directamente por la red).
 | N64 · PS3 | — | — | **no disponibles** (ver abajo) |
 
 > **Importante:** esta herramienta **no incluye archivos de Sony**. Los emuladores de PS1, PS2 y
-> PSP salen de juegos clásicos de PS4 que tengas tú, y los juegos deben ser copias de los tuyos.
+> PSP salen de juegos clásicos de PS4 que tengas tú (la app los copia de tu consola), y los juegos deben ser copias de los tuyos.
 > Los emuladores incluidos (NES, SNES, GBA, Genesis, Dreamcast y GameCube/Wii) son software libre.
 
 ## Menú dentro del juego: partidas guardadas y pantalla
@@ -141,26 +141,26 @@ Sus pestañas en la app lo explican; si aparece un emulador que funcione, se pod
    > file was not allocated enough space”), según el tamaño exacto del juego y de las imágenes.
    > El incluido calcula ese tamaño de forma exacta.
 4. **Emulador** (solo PS1, PS2 y PSP), **una sola vez**: los emuladores de estas consolas son
-   de Sony y no se pueden incluir en la app. Copia la carpeta de un clásico de PS4 de esa consola
-   (la que contiene `eboot.bin`, `sce_module/`, `sce_sys/`, …) en la carpeta `emuladores` que la
-   app crea junto al .exe:
+   de Sony y no se pueden incluir en la app, pero la app los **trae de tu PS4**: activa el FTP de
+   GoldHEN, abre en la PS4 un clásico de esa consola que tengas instalado y pulsa
+   **Traer de mi PS4** en su pestaña (o `python -m ps2fpkg traer-emulador ps2 --ps4 IP`).
+   La app copia solo el emulador (sin el juego) por FTP, con los ejecutables descifrados por el
+   propio FTP de GoldHEN (comando `DECRYPT`) y vueltos a firmar como fSELF (`ps2fpkg/fself.py`,
+   port de `make_fself` que da los mismos bytes que `create-fself` de OpenOrbis), conservando el
+   PAID y el tipo de programa del original. Se guarda en la carpeta `emuladores` junto al .exe:
 
    ```
-   emuladores\ps2\   ← PS2 Classic
-   emuladores\ps1\   ← PS1 Classic (PlayStation Plus)
-   emuladores\psp\   ← PSP Classic (PlayStation Plus)
+   emuladores\ps2\   ← de cualquier juego de PS2 para PS4 (Jak and Daxter, Rogue Galaxy, Kinetica…)
+   emuladores\ps1\   ← de cualquier clásico de PS1
+   emuladores\psp\   ← de cualquier clásico de PSP
    ```
 
-   Desde entonces la app los usa sola y no los vuelve a pedir (cada pestaña muestra
-   «✓ Listo» o el botón **Abrir carpeta**). Las demás consolas no necesitan nada.
-   Para obtener la carpeta: vuelca el juego instalado en tu PS4 con un *dumper* de aplicaciones,
-   o extrae un fPKG que ya tengas:
-   `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`
-   (puedes copiar `carpeta` completa; la app encuentra `uroot/` sola).
-   - PS2: las bases más usadas son las de *Jak and Daxter*, *Rogue Galaxy* y *Kinetica*.
-   - PS1 y PSP: cualquier clásico de PlayStation Plus de esa consola.
-   - Si la app avisa de que los ejecutables son **ELF sin firmar**, fírmalos como fSELF
-     (`make_fself`) antes; si no, la PS4 puede no abrir el juego.
+   Desde entonces la app los usa sola (cada pestaña muestra «✓ Listo»). Las demás consolas no
+   necesitan nada. Este método no se ha probado en una PS4: si un emulador traído así no
+   funciona, también se puede copiar a mano una carpeta de emulador con **Abrir carpeta** (un
+   vuelco de *dumper* o un .pkg extraído con
+   `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`;
+   la app encuentra `uroot/` sola).
 5. **Internet** (opcional, PS2): para descargar los parches de PCSX2 y la configuración oficial.
    Se guardan en `~/.ps2fpkg/cache`. Sin internet: `--parches CARPETA` con archivos `.pnach`.
 
@@ -181,7 +181,8 @@ Con el .exe: doble clic. Desde el código: `PS2-fPKG.bat` en Windows o `python -
 
 1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES, GBA, Genesis, Dreamcast, GameCube/Wii).
 2. Agrega el juego (el serial, el nombre y la carátula se detectan solos). Cambia el nombre o
-   la carátula si quieres. En PS1/PS2/PSP el emulador ya no se pide: se usa el de `emuladores\`.
+   la carátula si quieres. En PS1/PS2/PSP, la primera vez pulsa **Traer de mi PS4** (con un clásico
+   de esa consola abierto en la PS4); después el emulador ya no se pide.
 3. Revisa **Calidad de imagen y sonido** (ya viene en máxima).
 4. Para instalar por red, escribe la **IP de la PS4** y marca **Enviar a la PS4 al terminar**.
 5. **Crear fPKG**.
@@ -274,6 +275,7 @@ SNES, Dreamcast y GameCube, los verifican, los extraen y comprueban su contenido
 - [PCSX2 patches](https://github.com/PCSX2/pcsx2_patches) — parches de imagen de PS2 (se descargan, no se incluyen).
 - [Playstation-2-Classics-Patches-PS4](https://github.com/xXxTheDarkprogramerxXx/Playstation-2-Classics-Patches-PS4) — configuraciones oficiales de PS2 (se descargan, no se incluyen).
 - [Remote Package Installer](https://github.com/flatz/ps4_remote_pkg_installer) — instalación por red.
+- fSELF: port de `make_fself.py` (flatz) siguiendo [create-fself](https://github.com/OpenOrbis/create-fself) de OpenOrbis; copia por FTP según [ftpdump](https://github.com/hippie68/ftpdump).
 - Carátulas: [ps2-covers](https://github.com/xlenore/ps2-covers) y [psx-covers](https://github.com/xlenore/psx-covers)
   (por serial) y [libretro-thumbnails](https://thumbnails.libretro.com/) (por nombre); se descargan, no se incluyen.
 - Formato del TOC de PS1 contrastado con [Cue2toc](https://github.com/Goatman13/Cue2toc); opciones de

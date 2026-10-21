@@ -10,13 +10,14 @@
     python -m ps2fpkg dc JUEGO.gdi [opciones]                  Dreamcast (GDI, CHD, CDI o CUE)
     python -m ps2fpkg gc JUEGO.rvz [opciones]                  GameCube / Wii
     python -m ps2fpkg instalar JUEGO.pkg --ps4 IP              instalar por red con GoldHEN
+    python -m ps2fpkg traer-emulador ps2 --ps4 IP              copiar el emulador de un clásico abierto en la PS4
 """
 
 import argparse
 import sys
 import time
 
-from . import builder, cue, dreamcast, emu, gamecube, install, iso, ps1, psp, retro
+from . import builder, cue, dreamcast, emu, gamecube, install, iso, ps1, ps4ftp, psp, retro
 
 SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes", "gba", "genesis", "dc", "gc")
 
@@ -189,6 +190,19 @@ def parse_install(argv):
     return p.parse_args(argv)
 
 
+def parse_fetch(argv):
+    p = argparse.ArgumentParser(
+        prog="ps2fpkg traer-emulador",
+        description="Copia el emulador de un clásico de PS1, PS2 o PSP desde la PS4, por el FTP de GoldHEN: "
+                    "activa el servidor FTP de GoldHEN, abre el clásico en la PS4 y ejecuta esto. Se guarda en "
+                    "emuladores/<consola> junto a la app y desde entonces se usa solo.",
+    )
+    p.add_argument("consola", nargs="?", choices=("ps2", "ps1", "psp"), help="consola esperada (opcional)")
+    p.add_argument("--ps4", required=True, help="IP de la PS4")
+    p.add_argument("--puerto", type=int, default=ps4ftp.PORT, help=f"puerto FTP (por defecto {ps4ftp.PORT})")
+    return p.parse_args(argv)
+
+
 def _progress(done, total):
     print(f"\r  {done * 100 // max(1, total)}%", end="" if done < total else "\n", flush=True)
 
@@ -213,6 +227,10 @@ def run_install(pkgs, ps4="", port=8000, host_ip=""):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     try:
+        if argv and argv[0] == "traer-emulador":
+            a = parse_fetch(argv[1:])
+            ps4ftp.fetch(a.ps4, a.consola, port=a.puerto)
+            return 0
         if argv and argv[0] == "instalar":
             a = parse_install(argv[1:])
             run_install(a.pkg, a.ps4, a.puerto, a.ip_pc)
@@ -240,7 +258,8 @@ def main(argv=None):
         pkg = builder.build(opts, progress=_progress)
         if a.instalar_en and not a.gp4_only:
             run_install([pkg], a.instalar_en)
-    except (builder.BuildError, emu.EmuError, iso.DiscError, cue.CueError, OSError, ValueError, RuntimeError) as e:
+    except (builder.BuildError, emu.EmuError, iso.DiscError, cue.CueError, ps4ftp.Ps4FtpError, OSError, ValueError,
+            RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     return 0

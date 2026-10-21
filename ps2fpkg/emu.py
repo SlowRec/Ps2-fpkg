@@ -68,7 +68,9 @@ def prepare_default_dirs():
         readme = os.path.join(root, "LEEME.txt")
         if not os.path.exists(readme):
             with open(readme, "w", encoding="utf-8") as f:
-                f.write("Copia aquí, una sola vez, la carpeta de cada emulador (la que tiene eboot.bin):\n"
+                f.write("Aquí van los emuladores de PS2, PS1 y PSP (uno por carpeta, la que tiene eboot.bin).\n"
+                        "Lo más fácil: en la pestaña de cada consola usa \"Traer de mi PS4\" con un clásico\n"
+                        "de esa consola abierto en tu PS4 (FTP de GoldHEN activado). También puedes copiarlos:\n"
                         "  ps2\\  -> de un PS2 Classic de PS4\n"
                         "  ps1\\  -> de un PS1 Classic de PS4 (PlayStation Plus)\n"
                         "  psp\\  -> de un PSP Classic de PS4 (PlayStation Plus)\n"

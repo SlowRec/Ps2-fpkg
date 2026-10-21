@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import covers, cue, dreamcast, emu, gamecube, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
+from ps2fpkg import covers, cue, dreamcast, emu, fself, gamecube, images, iso, pkgbuild, ps1, ps4ftp, psp, retro, sfo  # noqa: E402
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -476,3 +476,161 @@ class EmuConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def make_elf(code=b"\x90" * 300, e_type=0xFE10):
+    """ELF de PS4 mínimo: cabecera, una cabecera de programa PT_LOAD y el segmento."""
+    header = bytearray(0x40)
+    header[:4] = b"\x7fELF"
+    header[4:7] = bytes([2, 1, 1])
+    header[0x10:0x12] = e_type.to_bytes(2, "little")
+    header[0x20:0x28] = (0x40).to_bytes(8, "little")      # e_phoff
+    header[0x36:0x38] = (0x38).to_bytes(2, "little")      # e_phentsize
+    header[0x38:0x3A] = (1).to_bytes(2, "little")         # e_phnum
+    import struct as _s
+    prog = _s.pack("<IIQQQQQQ", 1, 5, 0x100, 0, 0, len(code), len(code), 0x4000)
+    return bytes(header) + prog + bytes(0x100 - 0x40 - len(prog)) + code
+
+
+class FakeGoldhenFtp:
+    """Servidor FTP mínimo como el de GoldHEN: LIST, RETR, PASV y DECRYPT (alterna el descifrado)."""
+
+    def __init__(self, files):
+        import socket
+        import threading
+        self.files = files            # ruta -> bytes (SELF cifrado: (self, elf))
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(5)
+        self.port = self.sock.getsockname()[1]
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def dirs(self, path):
+        path = path.rstrip("/")
+        out = {}
+        for f in self.files:
+            if f.startswith(path + "/"):
+                rest = f[len(path) + 1:]
+                name = rest.split("/")[0]
+                out[name] = "/" in rest
+        return out
+
+    def _serve(self):
+        import threading
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            threading.Thread(target=self._session, args=(conn,), daemon=True).start()
+
+    def _session(self, conn):
+        import socket
+        decrypt = False
+        data_sock = None
+        f = conn.makefile("rwb", buffering=0)
+        f.write(b"220 GoldHEN FTP\r\n")
+        for raw in f:
+            line = raw.decode().strip()
+            cmd, _, arg = line.partition(" ")
+            cmd = cmd.upper()
+            if cmd in ("USER", "PASS", "TYPE"):
+                f.write(b"230 ok\r\n" if cmd != "TYPE" else b"200 ok\r\n")
+            elif cmd == "PASV":
+                data_sock = socket.socket()
+                data_sock.bind(("127.0.0.1", 0))
+                data_sock.listen(1)
+                p = data_sock.getsockname()[1]
+                f.write(f"227 Entering Passive Mode (127,0,0,1,{p >> 8},{p & 255})\r\n".encode())
+            elif cmd == "DECRYPT":
+                decrypt = not decrypt
+                f.write(f"200 SELF decryption {'enabled' if decrypt else 'disabled'}\r\n".encode())
+            elif cmd in ("LIST", "RETR"):
+                if cmd == "LIST":
+                    entries = self.dirs(arg)
+                    if not entries:
+                        f.write(b"550 no existe\r\n")
+                        continue
+                    body = "".join(f"{'d' if d else '-'}rwxr-xr-x 1 root root {0 if d else 10} Jan 01 2020 {n}\r\n"
+                                   for n, d in sorted(entries.items())).encode()
+                else:
+                    content = self.files.get(arg)
+                    if content is None:
+                        f.write(b"550 no existe\r\n")
+                        continue
+                    body = content[1] if isinstance(content, tuple) and decrypt else (
+                        content[0] if isinstance(content, tuple) else content)
+                f.write(b"150 ok\r\n")
+                dconn, _ = data_sock.accept()
+                dconn.sendall(body)
+                dconn.close()
+                data_sock.close()
+                f.write(b"226 ok\r\n")
+            elif cmd == "QUIT":
+                f.write(b"221 bye\r\n")
+                break
+            else:
+                f.write(b"502 no\r\n")
+        conn.close()
+
+    def close(self):
+        self.sock.close()
+
+
+class Ps4FtpTests(Base):
+    def classic(self, files):
+        elf = make_elf()
+        prx = make_elf(b"\xcc" * 500, e_type=0xFE18)
+        enc_eboot = bytearray(fself.make(elf, paid=0x3100000000000099, ptype=4, app_version=0x100, fw_version=0x5050000))
+        enc_eboot[-300:] = bytes(300)      # "cifrado": el segmento no es el ELF
+        root = "/mnt/sandbox/pfsmnt/CUSA12345-app0"
+        tree = {f"{root}/eboot.bin": (bytes(enc_eboot), elf),
+                f"{root}/sce_module/libc.prx": (fself.make(prx, ptype=5), prx),
+                f"{root}/sce_sys/param.sfo": b"PSF",
+                f"{root}/sce_sys/trophy/trophy00.trp": b"cifrado",
+                "/mnt/sandbox/pfsmnt/CUSA12345-app0-nest/pfs_image.dat": b"x"}
+        tree.update({f"{root}/{k}": v for k, v in files.items()})
+        return elf, prx, tree
+
+    def test_fetch_ps2_emulator(self):
+        elf, prx, tree = self.classic({"config-emu-ps4.txt": b"--gs-uprender=none\n", "image/disc01.iso": b"juego",
+                                       "feature_data/lua/x.lua": b"-- lua"})
+        server = FakeGoldhenFtp(tree)
+        self.addCleanup(server.close)
+        logs = []
+        system, dest = ps4ftp.fetch("127.0.0.1", "ps2", dest_root=self.dir, log=logs.append, port=server.port)
+        self.assertEqual((system, dest), ("ps2", os.path.join(self.dir, "ps2")))
+        eboot = read(os.path.join(dest, "eboot.bin"), "rb")
+        self.assertEqual(eboot[:4], fself.SELF_MAGIC)
+        self.assertEqual(fself.read_info(eboot), (0x3100000000000099, 4, 0x100, 0x5050000))
+        self.assertEqual(fself.unwrap(eboot)[0], elf[0x100:])
+        self.assertEqual(fself.unwrap(read(os.path.join(dest, "sce_module", "libc.prx"), "rb"))[0], prx[0x100:])
+        self.assertTrue(os.path.isfile(os.path.join(dest, "feature_data", "lua", "x.lua")))
+        self.assertFalse(os.path.exists(os.path.join(dest, "image")))
+        self.assertFalse(os.path.exists(os.path.join(dest, "sce_sys", "trophy")))
+        self.assertEqual(emu.locate(dest), dest)
+        self.assertIn("2 ejecutables", logs[-1])
+
+    def test_detects_other_console_and_errors(self):
+        _elf, _prx, tree = self.classic({"config-title.txt": b"--scale=4\n", "data/disc1.bin": b"juego",
+                                         "data/disc1.cue": b"cue"})
+        server = FakeGoldhenFtp(tree)
+        self.addCleanup(server.close)
+        system, dest = ps4ftp.fetch("127.0.0.1", "psp", dest_root=self.dir, log=lambda m: None, port=server.port)
+        self.assertEqual(system, "ps1")
+        self.assertFalse(os.path.exists(os.path.join(dest, "data", "disc1.bin")))
+        empty = FakeGoldhenFtp({"/mnt/sandbox/pfsmnt/CUSA00001-app0/eboot.bin": b"x"})
+        self.addCleanup(empty.close)
+        with self.assertRaisesRegex(ps4ftp.Ps4FtpError, "no es un clásico"):
+            ps4ftp.fetch("127.0.0.1", "ps2", dest_root=self.dir, log=lambda m: None, port=empty.port)
+
+
+class FselfTests(unittest.TestCase):
+    def test_roundtrip(self):
+        elf = make_elf(bytes(range(256)) * 100)
+        data = fself.make(elf, paid=0x3800000000000011)
+        self.assertEqual(data[:4], fself.SELF_MAGIC)
+        self.assertEqual(fself.read_info(data), (0x3800000000000011, 1, 0, 0))
+        self.assertEqual(fself.unwrap(data)[0], elf[0x100:])
+        with self.assertRaises(fself.FselfError):
+            fself.make(b"no es un elf")
