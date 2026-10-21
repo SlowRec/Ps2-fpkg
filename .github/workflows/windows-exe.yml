@@ -38,16 +38,18 @@ jobs:
           --add-data "emus;emus"
           ps_classics_fpkg.py
 
-      - name: Probar el .exe (crea un PKG de SNES de prueba)
+      - name: Probar el .exe (crea PKG de SNES y Dreamcast de prueba)
         shell: pwsh
         run: |
-          python -c "open('prueba.sfc', 'wb').write(bytes(512 * 1024))"
-          $p = Start-Process dist\PS-Classics-fPKG.exe -ArgumentList 'snes', 'prueba.sfc', '-o', 'salida' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "El .exe terminó con código $($p.ExitCode)" }
-          $pkg = Get-ChildItem salida\*.pkg
-          if (-not $pkg) { throw "El .exe no creó el PKG" }
-          & tools\win-x64\PkgTool.Core.exe pkg_validate $pkg.FullName | Tee-Object -Variable report
-          if ($report -match '\[ERROR\]') { throw "El PKG creado por el .exe no pasó la verificación" }
+          python -c "open('prueba.sfc', 'wb').write(bytes(512 * 1024)); open('prueba.cdi', 'wb').write(bytes(1024 * 1024))"
+          foreach ($game in @(@('snes', 'prueba.sfc', 'salida-snes'), @('dc', 'prueba.cdi', 'salida-dc'))) {
+            $p = Start-Process dist\PS-Classics-fPKG.exe -ArgumentList $game[0], $game[1], '-o', $game[2] -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "El .exe ($($game[0])) terminó con código $($p.ExitCode)" }
+            $pkg = Get-ChildItem "$($game[2])\*.pkg"
+            if (-not $pkg) { throw "El .exe no creó el PKG de $($game[0])" }
+            & tools\win-x64\PkgTool.Core.exe pkg_validate $pkg.FullName | Tee-Object -Variable report
+            if ($report -match '\[ERROR\]') { throw "El PKG de $($game[0]) creado por el .exe no pasó la verificación" }
+          }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -70,5 +72,5 @@ jobs:
           files: dist/PS-Classics-fPKG.exe
           body: |
             **PS-Classics-fPKG.exe** para Windows: doble clic y listo (no hace falta instalar Python).
-            Incluye PkgTool parcheado, eboot_decrypt y los emuladores de NES y SNES.
+            Incluye PkgTool parcheado, eboot_decrypt y los emuladores de NES, SNES, GBA y Dreamcast.
             Si Windows SmartScreen avisa, elige "Más información" → "Ejecutar de todas formas".

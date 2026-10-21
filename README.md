@@ -1,6 +1,6 @@
 # PS Classics → fPKG de PS4
 
-Convierte juegos de **PS2, PS1, PSP, NES y SNES** en **fPKG de PS4**, cada uno con su icono en
+Convierte juegos de **PS2, PS1, PSP, NES, SNES, GBA y Dreamcast** en **fPKG de PS4**, cada uno con su icono en
 el menú de la consola, optimizados para verse y sonar lo mejor posible y listos para instalar
 con **GoldHEN** (por USB o directamente por la red).
 
@@ -11,11 +11,13 @@ con **GoldHEN** (por USB o directamente por la red).
 | PSP | oficial de Sony (PSPHD, PlayStation Plus) | `.iso` | la carpeta de un PSP Classic que tengas |
 | NES | pNES (Nestopia) — **incluido** | `.nes`, `.fds`, `.zip` | nada más |
 | SNES | pSNES (Snes9x) — **incluido** | `.sfc`, `.smc`, `.zip` | nada más |
-| N64 | — | — | **no disponible** (ver abajo) |
+| GBA | pGBA (mGBA) — **incluido** | `.gba`, `.gb`, `.gbc`, `.zip` | nada más (también Game Boy y Game Boy Color) |
+| Dreamcast | Resonance (Flycast) — **incluido** | `.gdi`, `.chd`, `.cdi`, `.cue` | nada más (BIOS opcional) |
+| N64 · PS3 | — | — | **no disponibles** (ver abajo) |
 
 > **Importante:** esta herramienta **no incluye archivos de Sony**. Los emuladores de PS1, PS2 y
 > PSP salen de juegos clásicos de PS4 que tengas tú, y los juegos deben ser copias de los tuyos.
-> Los emuladores de NES y SNES incluidos son software libre (GPL-3.0).
+> Los emuladores incluidos (NES, SNES, GBA y Dreamcast) son software libre (GPL).
 
 ## Menú dentro del juego: partidas guardadas y pantalla
 
@@ -23,7 +25,8 @@ con **GoldHEN** (por USB o directamente por la red).
 | --- | --- | --- |
 | PS1 | botón **OPTIONS** | estados guardados (varias ranuras), **rebobinar**, presets visuales y el menú **Gráficos** (resolución, filtro Lanczos/cúbico, antialiasing), que la app deja activado |
 | PSP | el menú del emulador de PlayStation Plus (como en PS1) | estados guardados y **rebobinar**; la calidad de imagen se elige en la app antes de crear el PKG |
-| NES / SNES | **L1 + R1** | 4 ranuras de estados guardados (con miniatura), escalado, filtro, shader, mandos y salir. Al empezar el juego aparece el aviso «L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA» |
+| NES / SNES / GBA | **L1 + R1** | 4 ranuras de estados guardados (con miniatura), escalado, filtro, shader, mandos y salir. Al empezar el juego aparece el aviso «L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA» |
+| Dreamcast | **L3 + R3** | 10 ranuras de estados guardados con miniatura, trucos y parches, cambiar disco, ajustes de imagen (resolución, pantalla ancha, filtrado, *Frame Generation*) y cerrar el juego. Las memorias VMU funcionan como en la consola |
 | PS2 | — | el emulador de PS2 de Sony **no trae menú**: las partidas se guardan en la tarjeta de memoria virtual desde el propio juego, y la pantalla se configura en la app antes de crear el PKG |
 
 En PS2 se podría construir un menú propio con funciones internas del emulador, pero no están
@@ -78,7 +81,7 @@ emulador no admite, se omite completo en lugar de aplicarlo a medias.
 | Arte del UMD | ✓ | Usa el icono y el fondo del propio juego si no eliges otros. |
 | EBOOT descifrado | ✓ | El emulador lo necesita: se descifra automáticamente (no se toca tu ISO original). |
 
-**NES y SNES**
+**NES, SNES y GBA**
 
 | Imagen | Qué hace |
 | --- | --- |
@@ -90,14 +93,30 @@ emulador no admite, se omite completo en lugar de aplicarlo a medias.
 En SNES, el **sonido sincronizado** (activado) evita chasquidos. Son ajustes iniciales: luego
 se pueden cambiar desde el menú del emulador en la PS4.
 
+**Dreamcast**
+
+| Ajuste | Por defecto | Qué hace |
+| --- | --- | --- |
+| Resolución **alta** | ✓ | 2x (1280x960) y filtrado anisotrópico 8x. *Máxima* = 3x (1920x1440, supermuestreo sobre la salida 1080p, 16x); puede ir lenta en juegos pesados. *Nativa* = 640x480. *Original* = la que elijas en los ajustes de Resonance. |
+| Pantalla ancha | ✓ | 16:9 real en los ~230 juegos que tienen parche de pantalla ancha en Flycast; los demás quedan en 4:3 sin deformarse. |
+| Mostrar FPS | | Contador de FPS y velocidad. |
+| BIOS | | Opcional: `dc_boot.bin` (y `dc_flash.bin`) de tu Dreamcast. Sin ella se usa la BIOS libre de Flycast, que funciona con casi todos los juegos. |
+
+La resolución y la pantalla ancha elegidas en la app mandan en ese paquete; con *Original* se
+usan las de los ajustes de Resonance (que se pueden cambiar en el juego con L3 + R3).
+
 **Sobre el sonido:** todos los emuladores reproducen el audio original de cada consola; no hay
 un ajuste que lo "mejore" más allá de que suene completo y sin cortes, que es lo que se asegura
 (salida de audio activada, música CD-Audio en PS1, sincronía en SNES, correcciones oficiales en PS2).
 
-## Nintendo 64
+## Nintendo 64 y PS3
 
-**No es posible por ahora:** no existe ningún emulador de N64 para PS4 (ni de Sony ni homebrew)
-con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno, se podrá añadir.
+**No es posible por ahora:**
+- **N64:** no existe ningún emulador de N64 para PS4 (ni de Sony ni homebrew) con el que crear paquetes.
+- **PS3:** no existe un emulador de PS3 que funcione en PS4. El port de RPCS3 anunciado en octubre
+  de 2026 solo arranca el firmware de la PS3, todavía no juegos.
+
+Sus pestañas en la app lo explican; si aparece un emulador que funcione, se podrán añadir.
 
 ## Requisitos
 
@@ -121,7 +140,7 @@ con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno,
    ```
 
    Desde entonces la app los usa sola y no los vuelve a pedir (cada pestaña muestra
-   «✓ Listo» o el botón **Abrir carpeta**). NES y SNES no necesitan nada.
+   «✓ Listo» o el botón **Abrir carpeta**). NES, SNES, GBA y Dreamcast no necesitan nada.
    Para obtener la carpeta: vuelca el juego instalado en tu PS4 con un *dumper* de aplicaciones,
    o extrae un fPKG que ya tengas:
    `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`
@@ -137,7 +156,7 @@ con el que crear paquetes. La pestaña N64 de la app lo explica; si aparece uno,
 
 Descarga **PS-Classics-fPKG.exe** desde [Releases](https://github.com/SlowRec/ps2-fpkg/releases/latest)
 y ábrelo con doble clic: no hace falta instalar Python ni nada más (incluye PkgTool, eboot_decrypt
-y los emuladores de NES y SNES). La primera vez tarda unos segundos en abrir.
+y los emuladores de NES, SNES, GBA y Dreamcast). La primera vez tarda unos segundos en abrir.
 Si Windows SmartScreen avisa, elige *Más información → Ejecutar de todas formas*.
 
 El .exe se crea automáticamente en GitHub Actions (`.github/workflows/windows-exe.yml`): pasa
@@ -147,7 +166,7 @@ todas las pruebas en Windows, crea un PKG de prueba con el propio .exe y lo veri
 
 Con el .exe: doble clic. Desde el código: `PS2-fPKG.bat` en Windows o `python -m ps2fpkg`.
 
-1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES).
+1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES, GBA, Dreamcast).
 2. Agrega el juego (el serial, el nombre y la carátula se detectan solos). Cambia el nombre o
    la carátula si quieres. En PS1/PS2/PSP el emulador ya no se pide: se usa el de `emuladores\`.
 3. Revisa **Calidad de imagen y sonido** (ya viene en máxima).
@@ -165,9 +184,11 @@ python -m ps2fpkg psp "LocoRoco.iso" -o salida
 python -m ps2fpkg nes "Super Mario Bros. (World).nes" -o salida
 python -m ps2fpkg snes "Super Metroid (USA).sfc" -o salida --imagen crt --instalar-en 192.168.1.50
 python -m ps2fpkg nes "zelda.nes" -t "Zelda (mi copia)" --caratula portada.jpg
+python -m ps2fpkg gba "Metroid Fusion (USA).gba" -o salida
+python -m ps2fpkg dc "Sonic Adventure (USA)/disc.gdi" -o salida --resolucion maxima
 ```
 
-`python -m ps2fpkg ps1 --help` (o `ps2`, `psp`, `nes`, `snes`) muestra todas las opciones.
+`python -m ps2fpkg ps1 --help` (o `ps2`, `psp`, `nes`, `snes`, `gba`, `dc`) muestra todas las opciones.
 
 ## Instalar en la PS4 con GoldHEN
 
@@ -199,7 +220,15 @@ debe estar en **exFAT** (FAT32 no admite archivos tan grandes); la app avisa cua
   (`tools/pemu-autoboot.patch`) para que, al abrir el juego desde el menú de la PS4, cargue esa
   ROM directamente con los ajustes de imagen elegidos, que al salir del juego se cierre, y que
   el aviso inicial indique en PS4 cómo abrir el menú (L1 + R1).
-  Partidas guardadas: `/data/pnes` y `/data/psnes` en la PS4.
+  GBA igual, con pGBA (mGBA). Partidas guardadas: `/data/pnes`, `/data/psnes` y `/data/pgba` en la PS4.
+- **Dreamcast:** Resonance (Flycast para PS4) con el juego en `autoboot/game/`. El `eboot.bin` del
+  paquete es un lanzador propio (`tools/dc-launcher/main.c`) que lee `autoboot/args.txt` y arranca
+  Resonance (`resonance/eboot.bin`) con las opciones de imagen y la ruta del juego; Flycast lo
+  inicia directo y al cerrar el juego se cierra la app. Memorias VMU, estados guardados y ajustes
+  se guardan en `/data/Resonance`, compartidos con la app Resonance si la tienes. El paquete se
+  declara como versión 99.99 para que Resonance no cambie a una actualización descargada en
+  `/data/Resonance/app` (que arrancaría sin el juego): si tenías una ahí, se descarta y la app
+  Resonance la vuelve a ofrecer.
 
 En todas: `sce_sys/param.sfo`, `icon0.png`, `pic0.png`, `pic1.png`, `project.gp4`,
 `PkgTool pkg_build` y después `pkg_validate`.
@@ -210,13 +239,14 @@ En todas: `sce_sys/param.sfo`, `icon0.png`, `pic0.png`, `pic1.png`, `project.gp4
 python -m unittest discover tests
 ```
 
-Definiendo `PS2FPKG_PKGTOOL` con la ruta a PkgTool, las pruebas crean PKG reales de PS1, PS2 y
-SNES, los verifican, los extraen y comprueban su contenido.
+Definiendo `PS2FPKG_PKGTOOL` con la ruta a PkgTool, las pruebas crean PKG reales de PS1, PS2,
+SNES y Dreamcast, los verifican, los extraen y comprueban su contenido.
 
 ## Licencias y créditos
 
 - [LibOrbisPkg](https://github.com/maxton/LibOrbisPkg) (LGPL-3.0) — creación de PKG; corrección de PlayGo en `tools/build_pkgtool.py`.
-- [pemu](https://github.com/Cpasjuste/pemu) (GPL-3.0) — emuladores de NES y SNES incluidos en `emus/`; código del parche en `tools/pemu-autoboot.patch` y compilación en `tools/build_pemu.py`.
+- [pemu](https://github.com/Cpasjuste/pemu) (GPL-3.0) — emuladores de NES, SNES y GBA incluidos en `emus/`; código del parche en `tools/pemu-autoboot.patch` y compilación en `tools/build_pemu.py`.
+- [Resonance](https://github.com/iHaiDeeZ/Resonance) (GPL-2.0), basado en [Flycast](https://github.com/flyinghead/flycast) — emulador de Dreamcast incluido en `emus/resonance.zip` (versión v01.41 publicada, sin cambios; código fuente en su repositorio); preparación en `tools/build_resonance.py`.
 - [pspdecrypt](https://github.com/John-K/pspdecrypt) (GPL-3.0) — descifrado del EBOOT de PSP (`tools/build_pspdecrypt.py`).
 - [PCSX2 patches](https://github.com/PCSX2/pcsx2_patches) — parches de imagen de PS2 (se descargan, no se incluyen).
 - [Playstation-2-Classics-Patches-PS4](https://github.com/xXxTheDarkprogramerxXx/Playstation-2-Classics-Patches-PS4) — configuraciones oficiales de PS2 (se descargan, no se incluyen).

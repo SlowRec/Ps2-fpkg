@@ -12,6 +12,10 @@ LIBRETRO = "https://thumbnails.libretro.com/{system}/Named_Boxarts/"
 LIBRETRO_SYSTEMS = {
     "nes": "Nintendo - Nintendo Entertainment System",
     "snes": "Nintendo - Super Nintendo Entertainment System",
+    "gba": "Nintendo - Game Boy Advance",
+    "gb": "Nintendo - Game Boy",
+    "gbc": "Nintendo - Game Boy Color",
+    "dc": "Sega - Dreamcast",
     "ps1": "Sony - PlayStation",
     "ps2": "Sony - PlayStation 2",
     "psp": "Sony - PlayStation Portable",

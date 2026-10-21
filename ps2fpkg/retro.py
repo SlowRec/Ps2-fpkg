@@ -1,5 +1,5 @@
-"""NES y SNES -> fPKG de PS4 con pemu (pNES = Nestopia, pSNES = Snes9x), emuladores libres
-(GPL-3.0) para PS4 que vienen incluidos en emus/. La versión incluida tiene un parche
+"""NES, SNES y GBA -> fPKG de PS4 con pemu (pNES = Nestopia, pSNES = Snes9x, pGBA = mGBA),
+emuladores libres (GPL-3.0) para PS4 que vienen incluidos en emus/. La versión incluida tiene un parche
 (tools/pemu-autoboot.patch) para arrancar directo el juego del paquete: cada fPKG es un
 juego con su icono en el menú de la PS4, y al salir del juego se vuelve al menú."""
 
@@ -30,7 +30,10 @@ SYSTEMS = {
     "nes": System("nes", "NES", "pnes.zip", "PNES", "NESFPKG0", (".nes", ".fds", ".unf", ".unif", ".zip")),
     "snes": System("snes", "Super Nintendo", "psnes.zip", "SNES", "SNESFPKG",
                    (".sfc", ".smc", ".fig", ".swc", ".bs", ".zip")),
+    # mGBA también lee Game Boy y Game Boy Color.
+    "gba": System("gba", "Game Boy Advance", "pgba.zip", "GBAF", "GBAFPKG0", (".gba", ".gb", ".gbc", ".zip")),
 }
+GB_LOGO = bytes.fromhex("CEED6666")  # inicio del logo de Nintendo en la cabecera (0x104) de Game Boy
 
 # Ajustes de imagen (opciones del menú de pemu). SCALING=FIT llena la altura de la pantalla
 # manteniendo la proporción original; EFFECT es el shader de la versión de PS4.
@@ -51,7 +54,7 @@ VIDEO_LABELS = {
 
 @dataclasses.dataclass
 class Options:
-    system: str                 # "nes" | "snes"
+    system: str                 # "nes" | "snes" | "gba"
     rom: str
     output_dir: str
     title: str = ""
@@ -91,18 +94,33 @@ def check_rom(system, path):
         raise BuildError(f"{os.path.basename(path)} no tiene la cabecera iNES; no parece una ROM de NES.")
     elif system.key == "snes" and os.path.getsize(path) % 1024 not in (0, 512):
         raise BuildError(f"{os.path.basename(path)}: tamaño no válido para una ROM de SNES.")
+    elif system.key == "gba" and ext == ".gba":
+        with open(path, "rb") as f:
+            header = f.read(0xC0)
+        if len(header) < 0xC0 or header[0xB2] != 0x96:
+            raise BuildError(f"{os.path.basename(path)} no tiene la cabecera de GBA; no parece una ROM de GBA.")
+    elif system.key == "gba" and ext in (".gb", ".gbc"):
+        with open(path, "rb") as f:
+            f.seek(0x104)
+            if f.read(4) != GB_LOGO:
+                raise BuildError(f"{os.path.basename(path)} no tiene la cabecera de Game Boy.")
 
 
 def base_dir(system, explicit=""):
     """Carpeta de la app pemu: la indicada o la incluida en emus/ (se descomprime una vez)."""
     if explicit:
         return emu.locate(explicit, f"pemu ({system.name})")
-    zip_path = os.path.join(EMUS_DIR, system.base_zip)
+    return unpack(system.base_zip)
+
+
+def unpack(base_zip):
+    """Descomprime (una vez, en la caché) un emulador incluido en emus/ y devuelve su carpeta."""
+    zip_path = os.path.join(EMUS_DIR, base_zip)
     if not os.path.isfile(zip_path):
         raise BuildError(f"Falta {zip_path} (emulador incluido).")
     with open(zip_path, "rb") as f:
         digest = hashlib.sha1(f.read()).hexdigest()[:10]
-    dst = os.path.join(CACHE_DIR, f"{os.path.splitext(system.base_zip)[0]}-{digest}")
+    dst = os.path.join(CACHE_DIR, f"{os.path.splitext(base_zip)[0]}-{digest}")
     if not os.path.isfile(os.path.join(dst, "eboot.bin")):
         tmp = dst + ".tmp"
         with zipfile.ZipFile(zip_path) as z:
@@ -152,7 +170,10 @@ def build(opts, log=print, progress=None):
     pkg.write("autoboot/options.txt", options_text(opts))
     log(f"Imagen: {VIDEO_LABELS[opts.video]}")
 
-    cover = covers.resolve(opts, system.key, names=[os.path.basename(opts.rom), opts.title], log=log)
+    ext = os.path.splitext(opts.rom)[1].lower()
+    cover_system = {".gb": "gb", ".gbc": "gbc"}.get(ext, system.key) if system.key == "gba" else system.key
+    subtitle = {".gb": "Game Boy", ".gbc": "Game Boy Color"}.get(ext, system.name) if system.key == "gba" else system.name
+    cover = covers.resolve(opts, cover_system, names=[os.path.basename(opts.rom), opts.title], log=log)
     return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
-                     subtitle=system.name, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
+                     subtitle=subtitle, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
                      keep_work=opts.keep_work, validate=opts.validate, log=log)

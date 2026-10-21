@@ -4,6 +4,7 @@ tools/*
 !tools/LEEME.txt
 !tools/*.py
 !tools/*.patch
+!tools/dc-launcher/
 !tools/win-x64/
 !tools/linux-x64/
 tools/linux-x64/*
@@ -15,3 +16,4 @@ tools/linux-x64/*
 build/
 dist/
 *.spec
+emuladores/

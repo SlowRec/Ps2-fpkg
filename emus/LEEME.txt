@@ -1,4 +1,11 @@
-pnes.zip y psnes.zip: la app de PS4 de pemu (https://github.com/Cpasjuste/pemu, GPL-3.0),
+pnes.zip, psnes.zip y pgba.zip: la app de PS4 de pemu (https://github.com/Cpasjuste/pemu, GPL-3.0),
 compilada desde el commit eeb5199ee0657b87f65197cbb043e5014befffbd con tools/pemu-autoboot.patch.
 Para recompilarlas desde el código fuente: python tools/build_pemu.py
 Licencia: pemu-LICENSE.txt
+
+resonance.zip: Resonance v01.41 (https://github.com/iHaiDeeZ/Resonance, GPL-2.0, basado en Flycast),
+los archivos del .pkg publicado sin cambios (eboot.bin movido a resonance/eboot.bin), más el
+lanzador de tools/dc-launcher/main.c como eboot.bin. Código fuente de Resonance:
+https://github.com/iHaiDeeZ/Resonance/tree/v01.41
+Para prepararlo de nuevo: python tools/build_resonance.py
+Licencia: resonance-LICENSE.txt

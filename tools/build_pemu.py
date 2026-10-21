@@ -1,4 +1,4 @@
-"""Recompila las bases de NES y SNES (emus/pnes.zip, emus/psnes.zip) desde el código fuente.
+"""Recompila las bases de NES, SNES y GBA (emus/pnes.zip, emus/psnes.zip, emus/pgba.zip) desde el código fuente.
 
 pemu (https://github.com/Cpasjuste/pemu, GPL-3.0) con tools/pemu-autoboot.patch: si el paquete
 trae /app0/autoboot/rom.txt, la app arranca ese juego directamente y aplica
@@ -22,12 +22,13 @@ import zipfile
 
 PEMU = "https://github.com/Cpasjuste/pemu"
 PEMU_COMMIT = "eeb5199ee0657b87f65197cbb043e5014befffbd"
-SUBMODULES = ("external/libcross2d", "external/sscrap", "external/cores/nestopia", "external/cores/snes9x")
+SUBMODULES = ("external/libcross2d", "external/sscrap", "external/cores/nestopia", "external/cores/snes9x",
+              "external/cores/mgba")
 PACBREW = "https://pacman.mydedibox.fr/pacbrew/packages/"
 OPENORBIS = "/opt/pacbrew/ps4/openorbis"
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-CORES = {"pnes": "PNES", "psnes": "PSNE"}
+CORES = {"pnes": "PNES", "psnes": "PSNE", "pgba": "PGBA"}
 
 
 def run(cmd, cwd=None, env=None):
@@ -55,6 +56,19 @@ def install_toolchain():
                 pkg.extractall("/", members=[m for m in pkg.getmembers() if m.name.startswith("opt/")])
 
 
+def check_oelf(build, core):
+    """El create-fself de PacBrew a veces duplica el segmento de datos y la PS4 rechaza el eboot
+    (CE-41839-5): debe haber exactamente un PT_LOAD de lectura/escritura."""
+    for dirpath, _dirs, files in os.walk(build):
+        if f"{core}.oelf" in files:
+            out = subprocess.run([os.path.join(OPENORBIS, "bin", "llvm-readelf"), "-l", "-W",
+                                  os.path.join(dirpath, f"{core}.oelf")], capture_output=True, text=True).stdout
+            if len(re.findall(r"^\s*LOAD\s.*\sRW\s", out, re.M)) != 1:
+                sys.exit(f"{core}.oelf tiene segmentos de datos duplicados (fallo de create-fself):\n{out}")
+            return
+    print(f"aviso: no se encontró {core}.oelf para revisarlo", flush=True)
+
+
 def main():
     if not sys.platform.startswith("linux"):
         sys.exit("Este script funciona en Linux (o WSL).")
@@ -72,11 +86,11 @@ def main():
         run(["git", "checkout", "-q", "FETCH_HEAD"], cwd=src)
         run(["git", "submodule", "update", "--init", "--depth", "1", *SUBMODULES], cwd=src)
         run(["git", "apply", os.path.join(HERE, "pemu-autoboot.patch")], cwd=src)
-        # Solo NES y SNES: los demás núcleos necesitan submódulos que no hacen falta aquí.
+        # Solo NES, SNES y GBA: los demás núcleos necesitan submódulos que no hacen falta aquí.
         cmake = os.path.join(src, "CMakeLists.txt")
         with open(cmake) as f:
             text = f.read()
-        for core in ("pfbneo", "pgen", "pgba"):
+        for core in ("pfbneo", "pgen"):
             text = text.replace(f"add_subdirectory(src/cores/{core})", f"#add_subdirectory(src/cores/{core})")
         with open(cmake, "w") as f:
             f.write(text)
@@ -85,6 +99,7 @@ def main():
         run(["cmake", "-G", "Unix Makefiles", "-DPLATFORM_PS4=ON", "-DCMAKE_BUILD_TYPE=Release", ".."], build, env)
         run(["make", f"-j{os.cpu_count() or 2}", *(f"{c}_pkg" for c in CORES)], build, env)
         for core, prefix in CORES.items():
+            check_oelf(build, core)
             pkg = next(f for f in os.listdir(build) if f.endswith(".pkg") and f"-{prefix}" in f)
             out = os.path.join(build, f"ext_{core}")
             run([pkgtool, "pkg_extract", "--passcode", "0" * 32, os.path.join(build, pkg), out])

@@ -5,6 +5,8 @@
     python -m ps2fpkg psp JUEGO.iso -e EMULADOR [opciones]     PSP
     python -m ps2fpkg nes JUEGO.nes [opciones]                 NES
     python -m ps2fpkg snes JUEGO.sfc [opciones]                SNES
+    python -m ps2fpkg gba JUEGO.gba [opciones]                 GBA (también Game Boy / Color)
+    python -m ps2fpkg dc JUEGO.gdi [opciones]                  Dreamcast (GDI, CHD, CDI o CUE)
     python -m ps2fpkg instalar JUEGO.pkg --ps4 IP              instalar por red con GoldHEN
 """
 
@@ -12,9 +14,9 @@ import argparse
 import sys
 import time
 
-from . import builder, cue, emu, install, iso, ps1, psp, retro
+from . import builder, cue, dreamcast, emu, install, iso, ps1, psp, retro
 
-SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes")
+SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes", "gba", "dc")
 
 
 def _cover_args(p):
@@ -69,6 +71,17 @@ def parse_system(cmd, argv):
         p.add_argument("--eboot-decrypt", default="", help="ruta a eboot_decrypt; por defecto el de tools/")
         p.add_argument("--emu-arg", action="append", default=[], metavar="--CLAVE=VALOR",
                        help="línea extra para config-title.txt (repetible)")
+    elif cmd == "dc":
+        p = argparse.ArgumentParser(prog="ps2fpkg dc", description="Convierte un juego de Dreamcast en fPKG de "
+                                    "PS4 con Resonance (Flycast, incluido): el juego arranca directo desde el menú.")
+        p.add_argument("juego", help="juego (" + ", ".join(dreamcast.EXTENSIONS) + "); con sus pistas al lado")
+        p.add_argument("-q", "--resolucion", choices=list(dreamcast.RESOLUTIONS), default="alta",
+                       help="; ".join(f"{k}: {v}" for k, v in dreamcast.RESOLUTION_LABELS.items()))
+        p.add_argument("--sin-16-9", dest="widescreen", action="store_false",
+                       help="no usar los parches de pantalla ancha de los juegos (siempre 4:3)")
+        p.add_argument("--mostrar-fps", dest="show_fps", action="store_true", help="mostrar los FPS")
+        p.add_argument("--bios", default="", metavar="CARPETA",
+                       help="carpeta con dc_boot.bin y dc_flash.bin de tu Dreamcast (opcional)")
     else:
         system = retro.SYSTEMS[cmd]
         p = argparse.ArgumentParser(prog=f"ps2fpkg {cmd}", description=f"Convierte una ROM de {system.name} "
@@ -82,7 +95,8 @@ def parse_system(cmd, argv):
         p.add_argument("--mostrar-fps", dest="show_fps", action="store_true", help="mostrar los FPS")
     _common(p, emu_required=False,
             emu_help=("carpeta de un " + {"ps1": "PS1 Classic", "psp": "PSP Classic"}[cmd] + " de PS4 extraído; "
-                      f"por defecto la de emuladores/{cmd}") if cmd in ("ps1", "psp") else "pemu propio (opcional)")
+                      f"por defecto la de emuladores/{cmd}") if cmd in ("ps1", "psp")
+            else "base de Resonance propia (opcional)" if cmd == "dc" else "pemu propio (opcional)")
     return p.parse_args(argv)
 
 
@@ -97,6 +111,9 @@ def system_options(cmd, a):
     if cmd == "psp":
         return psp, psp.Options(iso=a.iso, serial=a.serial, quality=a.calidad, eboot_decrypt=a.eboot_decrypt,
                                 emu_args=a.emu_arg, **common)
+    if cmd == "dc":
+        return dreamcast, dreamcast.Options(game=a.juego, resolution=a.resolucion, widescreen=a.widescreen,
+                                            show_fps=a.show_fps, bios_dir=a.bios, **common)
     return retro, retro.Options(system=cmd, rom=a.rom, video=a.imagen, audio_sync=getattr(a, "audio_sync", True),
                                 show_fps=a.show_fps, **common)
 
@@ -105,7 +122,7 @@ def parse_convert(argv):
     p = argparse.ArgumentParser(
         prog="ps2fpkg",
         description="Convierte ISOs de PS2 en fPKG de PS4 (PS2 Classics). Otras consolas: "
-                    "'ps2fpkg ps1|psp|nes|snes --help'. Instalar por red: 'ps2fpkg instalar --help'.",
+                    "'ps2fpkg ps1|psp|nes|snes|gba|dc --help'. Instalar por red: 'ps2fpkg instalar --help'.",
     )
     p.add_argument("iso", nargs="+", help="ISO(s) del juego, en orden de disco (también acepta BIN de 2352 bytes/sector)")
     p.add_argument("-e", "--emu", default="",

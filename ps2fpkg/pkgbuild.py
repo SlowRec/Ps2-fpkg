@@ -111,11 +111,11 @@ class Package:
         self.files[rel] = os.path.abspath(source)
 
     def build(self, *, title, title_id, icon="", background="", cover="", subtitle="", pkgtool="",
-              gp4_only=False, keep_work=False, validate=True, log=print, icon_fit="cover"):
+              gp4_only=False, keep_work=False, validate=True, log=print, icon_fit="cover", attribute=0):
         """Añade param.sfo e imágenes, crea el PKG y lo verifica. Devuelve la ruta del .pkg
         (o del .gp4 si gp4_only). Imágenes: icono/fondo propios > carátula > genéricas con el título."""
         validate_ids(title_id, self.content_id)
-        self.write("sce_sys/param.sfo", sfo.ps2_classic(title, title_id, self.content_id))
+        self.write("sce_sys/param.sfo", sfo.ps2_classic(title, title_id, self.content_id, attribute=attribute))
         log("Generando imágenes del menú...")
         if cover and images.Image is None:
             log("Aviso: instala Pillow (pip install pillow) para usar la carátula; se usan imágenes genéricas.")

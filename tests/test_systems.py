@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import covers, cue, emu, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
+from ps2fpkg import covers, cue, dreamcast, emu, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -268,6 +268,93 @@ class RetroTests(Base):
         self.assertEqual(read(os.path.join(root, "autoboot", "rom.txt")), "Juego SNES (Europe).sfc\n")
         self.assertEqual(read(os.path.join(root, "eboot.bin"), "rb")[:4], bytes.fromhex("4f153d1d"))  # fSELF
         self.assertEqual(os.path.getsize(os.path.join(root, "autoboot", "Juego SNES (Europe).sfc")), 512 * 1024)
+
+    def test_gba_and_game_boy(self):
+        gba = os.path.join(self.dir, "Juego GBA (USA).gba")
+        header = bytearray(0xC0)
+        header[0xB2] = 0x96
+        write(gba, bytes(header) + bytes(4 * 1024 * 1024 - 0xC0))
+        gp4 = retro.build(retro.Options(system="gba", rom=gba, output_dir=self.out, gp4_only=True), log=lambda m: None)
+        files = gp4_files(gp4)
+        self.assertIn("eboot.bin", files)
+        self.assertEqual(read(files["autoboot/rom.txt"]), "Juego GBA (USA).gba\n")
+        self.assertRegex(ET.parse(gp4).getroot().find("volume/package").get("content_id"),
+                         r"^IV0001-GBAF\d{5}_00-[0-9A-F]{8}GBAFPKG0$")
+        gbc = os.path.join(self.dir, "Juego (USA).gbc")
+        write(gbc, bytes(0x104) + bytes.fromhex("CEED6666") + bytes(32 * 1024))
+        files = gp4_files(retro.build(retro.Options(system="gba", rom=gbc, output_dir=self.out, gp4_only=True),
+                                      log=lambda m: None))
+        self.assertIn("autoboot/Juego (USA).gbc", files)
+        bad = os.path.join(self.dir, "x.gba")
+        write(bad, bytes(1024))
+        with self.assertRaisesRegex(pkgbuild.BuildError, "cabecera de GBA"):
+            retro.build(retro.Options(system="gba", rom=bad, output_dir=self.out, gp4_only=True))
+
+
+class DreamcastTests(Base):
+    def setUp(self):
+        super().setUp()
+        game = os.path.join(self.dir, "Sonic Adventure (USA)")
+        os.makedirs(game)
+        ip = bytearray(2352)
+        ip[16:16 + 16] = b"SEGA SEGAKATANA "
+        ip[16 + 0x40:16 + 0x4A] = b"MK-51000  "
+        ip[16 + 0x80:16 + 0x80 + 15] = b"SONIC ADVENTURE"
+        write(os.path.join(game, "track01.bin"), bytes(2352 * 300))
+        write(os.path.join(game, "track02.raw"), bytes(2352 * 150))
+        write(os.path.join(game, "track 03.bin"), bytes(ip) + bytes(2352 * 100))
+        self.gdi = os.path.join(game, "disc.gdi")
+        write(self.gdi, '3\n1 0 4 2352 track01.bin 0\n2 450 0 2352 track02.raw 0\n'
+                        '3 45000 4 2352 "track 03.bin" 0\n')
+
+    def test_gdi_project(self):
+        gp4 = dreamcast.build(dreamcast.Options(game=self.gdi, output_dir=self.out, gp4_only=True),
+                              log=lambda m: None)
+        files = gp4_files(gp4)
+        for name in ("eboot.bin", "resonance/eboot.bin", "sce_module/libc.prx", "launcher/cacert.pem",
+                     "autoboot/game/disc.gdi", "autoboot/game/track02.raw", "autoboot/game/track 03.bin"):
+            self.assertIn(name, files)
+        self.assertEqual(read(files["version.txt"]).strip(), "99.99")
+        args = read(files["autoboot/args.txt"]).splitlines()
+        self.assertEqual(args[-1], "/app0/autoboot/game/disc.gdi")
+        self.assertIn("config:rend.Resolution=960", args)
+        self.assertIn("config:rend.WidescreenGameHacks=yes", args)
+        self.assertEqual(args[0], "-config")
+        with open(files["sce_sys/param.sfo"], "rb") as f:
+            param = sfo.parse(f.read())
+        self.assertEqual(param["TITLE"], "Sonic Adventure")   # carpeta, porque disc.gdi es genérico
+        self.assertEqual(param["ATTRIBUTE"], 2)
+        self.assertRegex(param["CONTENT_ID"], r"^IV0001-DCFP\d{5}_00-[0-9A-F]{8}DCFPKG00$")
+        self.assertEqual(dreamcast.read_ip(dreamcast.gdi_files(self.gdi)), ("MK-51000", "SONIC ADVENTURE"))
+
+    def test_options_bios_and_errors(self):
+        bios = os.path.join(self.dir, "bios")
+        write(os.path.join(bios, "dc_boot.bin"), bytes(2 * 1024 * 1024))
+        chd = os.path.join(self.dir, "Crazy Taxi (USA).chd")
+        write(chd, b"MComprHD" + bytes(1000))
+        gp4 = dreamcast.build(dreamcast.Options(game=chd, output_dir=self.out, gp4_only=True, resolution="original",
+                                                widescreen=False, show_fps=True, bios_dir=bios),
+                              log=lambda m: None)
+        files = gp4_files(gp4)
+        self.assertIn("data/dc_boot.bin", files)
+        args = read(files["autoboot/args.txt"]).splitlines()
+        self.assertEqual(args[-1], "/app0/autoboot/game/Crazy Taxi (USA).chd")
+        self.assertFalse(any("rend.Resolution" in a for a in args))
+        self.assertIn("config:rend.WidescreenGameHacks=no", args)
+        self.assertIn("config:rend.ShowFPS=yes", args)
+        os.remove(os.path.join(os.path.dirname(self.gdi), "track02.raw"))
+        with self.assertRaisesRegex(pkgbuild.BuildError, "track02.raw"):
+            dreamcast.build(dreamcast.Options(game=self.gdi, output_dir=self.out, gp4_only=True))
+        with self.assertRaisesRegex(pkgbuild.BuildError, "formato"):
+            dreamcast.build(dreamcast.Options(game=self.out + ".iso", output_dir=self.out, gp4_only=True))
+
+    @unittest.skipUnless(REAL_PKGTOOL, "define PS2FPKG_PKGTOOL")
+    def test_real_pkg(self):
+        pkg = dreamcast.build(dreamcast.Options(game=self.gdi, output_dir=self.out), log=lambda m: None)
+        root = self.extract(pkg)
+        self.assertEqual(read(os.path.join(root, "eboot.bin"), "rb")[:4], bytes.fromhex("4f153d1d"))  # fSELF
+        self.assertEqual(read(os.path.join(root, "resonance", "eboot.bin"), "rb")[:4], bytes.fromhex("4f153d1d"))
+        self.assertTrue(os.path.isfile(os.path.join(root, "autoboot", "game", "track 03.bin")))
 
 
 class CoverTests(Base):

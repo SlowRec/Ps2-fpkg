@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 import subprocess
 import sys
 
-from . import __version__, builder, covers, emu, images, install, ps1, psp, retro
+from . import __version__, builder, covers, dreamcast, emu, images, install, ps1, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -68,6 +68,14 @@ def _retro_options(system):
     return make
 
 
+def _dc_options(v, files, flags, quality, _args):
+    bios = v.get("bios", "")
+    return dreamcast, dreamcast.Options(
+        game=files[0], output_dir=v["output_dir"], title=v["title"], icon=v["icon"], background=v["background"],
+        cover=v["cover"], find_cover=not v["cover"], bios_dir=os.path.dirname(bios) if bios else "",
+        pkgtool=v["pkgtool"], gp4_only=v["gp4_only"], resolution=quality, **flags)
+
+
 SPECS = [
     (Spec("ps2", "PS2", "Discos (ISO/BIN, en orden)", [("Imágenes de disco", "*.iso *.bin *.img"), ("Todos", "*")],
           True, "emulador de un PS2 Classic de PS4", builder.detect_serial,
@@ -98,8 +106,23 @@ SPECS = [
           quality={v: k for k, v in retro.VIDEO_LABELS.items()}, quality_label="Imagen",
           flags=(("audio_sync", "Sonido sincronizado (sin chasquidos)", True), ("show_fps", "Mostrar FPS", False)),
           note="Emulador incluido (Snes9x). El juego arranca directo desde el menú de la PS4."), _retro_options("snes")),
+    (Spec("gba", "GBA", "ROM", [("GBA / Game Boy", "*.gba *.gb *.gbc *.zip"), ("Todos", "*")], False,
+          quality={v: k for k, v in retro.VIDEO_LABELS.items()}, quality_label="Imagen",
+          flags=(("show_fps", "Mostrar FPS", False),),
+          note="Emulador incluido (mGBA); también acepta Game Boy y Game Boy Color. "
+               "El juego arranca directo desde el menú de la PS4."), _retro_options("gba")),
+    (Spec("dc", "Dreamcast", "Juego (GDI, CHD, CDI o CUE)",
+          [("Dreamcast", "*.gdi *.chd *.cdi *.cue"), ("Todos", "*")], False,
+          quality={v: k for k, v in dreamcast.RESOLUTION_LABELS.items()}, quality_label="Resolución",
+          flags=(("widescreen", "Pantalla ancha (juegos con parche 16:9)", True), ("show_fps", "Mostrar FPS", False)),
+          extra_files=(("bios", "BIOS dc_boot.bin", [("BIOS de Dreamcast", "dc_boot.bin *.bin"), ("Todos", "*")]),),
+          note="Emulador incluido (Resonance, basado en Flycast). En el juego, L3 + R3 abre el menú de "
+               "partidas guardadas y ajustes. La BIOS es opcional."), _dc_options),
 ]
 
+PS3_NOTE = ("PlayStation 3 no está disponible: todavía no existe un emulador de PS3 que funcione en PS4. "
+            "El port de RPCS3 anunciado en octubre de 2026 solo arranca el firmware de la PS3, no juegos. "
+            "Si llega a correr juegos, se podrá añadir aquí.")
 N64_NOTE = ("Nintendo 64 no está disponible: no existe un emulador de N64 para PS4, ni oficial de Sony "
             "ni homebrew, con el que crear paquetes. Si aparece uno, se podrá añadir aquí.")
 
@@ -299,7 +322,8 @@ class SystemTab(ttk.Frame):
                 except Exception:  # noqa: BLE001 — el título es opcional
                     pass
             if not self.vars["title"].get():
-                self.vars["title"].set(retro.clean_title(path))
+                self.vars["title"].set(dreamcast.default_title(path) if self.spec.key == "dc"
+                                       else retro.clean_title(path))
         if self.spec.detect:
             try:
                 serial = self.spec.detect(path)
@@ -410,9 +434,10 @@ class App(ttk.Frame):
             tab = SystemTab(self.notebook, self, spec, make)
             self.notebook.add(tab, text=f"  {spec.tab}  ")
             self.tabs.append(tab)
-        n64 = ttk.Frame(self.notebook, padding=20)
-        ttk.Label(n64, text=N64_NOTE, wraplength=560, justify="left").grid(sticky="w")
-        self.notebook.add(n64, text="  N64  ")
+        for name, note in (("N64", N64_NOTE), ("PS3", PS3_NOTE)):
+            frame = ttk.Frame(self.notebook, padding=20)
+            ttk.Label(frame, text=note, wraplength=560, justify="left").grid(sticky="w")
+            self.notebook.add(frame, text=f"  {name}  ")
         last = self.settings.get("tab")
         for i, tab in enumerate(self.tabs):
             if tab.spec.key == last:
