@@ -12,6 +12,10 @@ import zipfile
 from . import covers, emu, pkgbuild
 from .pkgbuild import BuildError
 
+# Los del param.sfo de los paquetes originales de pemu (add_pkg de PacBrew): con "gd" y 0, como
+# un juego, la app no recibe pantalla de Piglet y no abre.
+PEMU_CATEGORY = "gde"
+PEMU_SYSTEM_VER = 0x3FC
 EMUS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "emus")
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".ps2fpkg", "emus")
 
@@ -184,5 +188,5 @@ def build(opts, log=print, progress=None):
     cover_system, subtitle = VARIANTS.get(ext, (system.key, system.name))
     cover = covers.resolve(opts, cover_system, names=[os.path.basename(opts.rom), opts.title], log=log)
     return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
-                     subtitle=subtitle, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
+                     subtitle=subtitle, category=PEMU_CATEGORY, system_ver=PEMU_SYSTEM_VER, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,
                      keep_work=opts.keep_work, validate=opts.validate, log=log)

@@ -53,19 +53,20 @@ def parse(blob):
     return out
 
 
-def ps2_classic(title, title_id, content_id, version="01.00", attribute=0):
-    """param.sfo mínimo para un juego (categoría gd) en fPKG. attribute 0x2: los diálogos del
-    sistema (teclado) confirman con X."""
+def ps2_classic(title, title_id, content_id, version="01.00", attribute=0, category="gd", system_ver=0):
+    """param.sfo mínimo para un juego en fPKG. attribute 0x2: los diálogos del sistema (teclado)
+    confirman con X. category "gde" y system_ver 0x3FC son los del homebrew de PacBrew/OpenOrbis
+    (pemu): sin ellos el sistema no le da pantalla (Piglet) y la app no abre."""
     return build([
         ("APP_TYPE", 1, 4),
         ("APP_VER", version, 8),
         ("ATTRIBUTE", attribute, 4),
-        ("CATEGORY", "gd", 4),
+        ("CATEGORY", category, 4),
         ("CONTENT_ID", content_id, 48),
         ("DOWNLOAD_DATA_SIZE", 0, 4),
         ("FORMAT", "obs", 4),
         ("PARENTAL_LEVEL", 1, 4),
-        ("SYSTEM_VER", 0, 4),
+        ("SYSTEM_VER", system_ver, 4),
         ("TITLE", title, 128),
         ("TITLE_ID", title_id, 12),
         ("VERSION", version, 8),

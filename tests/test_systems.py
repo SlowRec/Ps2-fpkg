@@ -189,7 +189,9 @@ class PspTests(Base):
         image = files["data/USER_L0.IMG"]
         self.assertNotEqual(image, os.path.abspath(os.path.join(self.base, "data/USER_L0.IMG")))
         with iso.DiscImage(image) as disc:
-            self.assertEqual(disc.read_file("PSP_GAME/SYSDIR/EBOOT.BIN"), b"\x7fELF-descifrado")
+            eboot = disc.read_file("PSP_GAME/SYSDIR/EBOOT.BIN")
+            self.assertEqual(len(eboot), len(self.eboot))           # tamaño original, como PSP-FPKG
+            self.assertTrue(eboot.startswith(b"\x7fELF-descifrado"))
             self.assertEqual(disc.read_file("PSP_GAME/USRDIR/DATA.BIN"), b"datos")
         with iso.DiscImage(self.iso) as disc:  # la ISO original no se toca
             self.assertEqual(disc.read_file("PSP_GAME/SYSDIR/EBOOT.BIN"), self.eboot)
@@ -240,6 +242,9 @@ class RetroTests(Base):
         self.assertNotIn("AUDIO_SYNC", options)
         cid = ET.parse(gp4).getroot().find("volume/package").get("content_id")
         self.assertRegex(cid, r"^IV0001-PNES\d{5}_00-[0-9A-F]{8}NESFPKG0$")
+        with open(files["sce_sys/param.sfo"], "rb") as f:
+            param = sfo.parse(f.read())
+        self.assertEqual((param["CATEGORY"], param["SYSTEM_VER"]), ("gde", 0x3FC))   # como pemu
 
     def test_snes_options_and_title(self):
         gp4 = retro.build(retro.Options(system="snes", rom=self.snes, output_dir=self.out, gp4_only=True,

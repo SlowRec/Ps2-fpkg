@@ -7,7 +7,6 @@ actualizando el tamaño en el directorio de la ISO."""
 import dataclasses
 import os
 import shutil
-import struct
 import subprocess
 import tempfile
 
@@ -74,7 +73,7 @@ def decrypt_eboot(image, tool, log):
         entry = disc.find_record(EBOOT)
         if entry is None:
             raise BuildError("La ISO no tiene PSP_GAME/SYSDIR/EBOOT.BIN; ¿es un juego de PSP?")
-        lba, size, record = entry
+        lba, size, _record = entry
         data = disc.read_extent(lba, size)
     if data[:4] == b"\x7fELF":
         log("EBOOT.BIN ya está descifrado.")
@@ -95,12 +94,12 @@ def decrypt_eboot(image, tool, log):
             plain = f.read()
     if len(plain) > size:
         raise BuildError("El EBOOT descifrado no cabe en su lugar dentro de la ISO.")
+    # Como PSP-FPKG: el ELF descifrado se escribe sobre el principio del EBOOT y el tamaño del
+    # archivo en el directorio de la ISO no cambia.
     with open(image, "r+b") as f:
         f.seek(lba * iso.SECTOR)
-        f.write(plain + bytes(size - len(plain)))  # el resto del archivo original queda en ceros
-        f.seek(record + 10)
-        f.write(struct.pack("<I", len(plain)) + struct.pack(">I", len(plain)))
-    log(f"EBOOT.BIN descifrado ({size} -> {len(plain)} bytes).")
+        f.write(plain)
+    log(f"EBOOT.BIN descifrado ({len(plain)} bytes, en el lugar del original de {size}).")
 
 
 def build(opts, log=print, progress=None):
