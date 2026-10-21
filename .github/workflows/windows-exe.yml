@@ -38,11 +38,12 @@ jobs:
           --add-data "emus;emus"
           ps_classics_fpkg.py
 
-      - name: Probar el .exe (crea PKG de SNES y Dreamcast de prueba)
+      - name: Probar el .exe (crea PKG de SNES, Dreamcast y GameCube de prueba)
         shell: pwsh
         run: |
           python -c "open('prueba.sfc', 'wb').write(bytes(512 * 1024)); open('prueba.cdi', 'wb').write(bytes(1024 * 1024))"
-          foreach ($game in @(@('snes', 'prueba.sfc', 'salida-snes'), @('dc', 'prueba.cdi', 'salida-dc'))) {
+          python -c "h = bytearray(0x400); h[:6] = b'GALE01'; h[0x1C:0x20] = bytes.fromhex('C2339F3D'); open('prueba.iso', 'wb').write(bytes(h) + bytes(1024 * 1024))"
+          foreach ($game in @(@('snes', 'prueba.sfc', 'salida-snes'), @('dc', 'prueba.cdi', 'salida-dc'), @('gc', 'prueba.iso', 'salida-gc'))) {
             $p = Start-Process dist\PS-Classics-fPKG.exe -ArgumentList $game[0], $game[1], '-o', $game[2] -Wait -PassThru
             if ($p.ExitCode -ne 0) { throw "El .exe ($($game[0])) terminó con código $($p.ExitCode)" }
             $pkg = Get-ChildItem "$($game[2])\*.pkg"
@@ -69,8 +70,12 @@ jobs:
           name: PS Classics fPKG ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          files: dist/PS-Classics-fPKG.exe
+          files: |
+            dist/PS-Classics-fPKG.exe
+            TUTORIAL.md
           body: |
             **PS-Classics-fPKG.exe** para Windows: doble clic y listo (no hace falta instalar Python).
-            Incluye PkgTool parcheado, eboot_decrypt y los emuladores de NES, SNES, GBA y Dreamcast.
+            Incluye PkgTool parcheado, eboot_decrypt y los emuladores de NES, SNES, GBA, Genesis,
+            Dreamcast y GameCube/Wii.
+            **TUTORIAL.md**: guía paso a paso para crear e instalar los juegos de cada consola.
             Si Windows SmartScreen avisa, elige "Más información" → "Ejecutar de todas formas".

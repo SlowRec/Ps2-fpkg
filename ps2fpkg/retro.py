@@ -1,5 +1,5 @@
-"""NES, SNES y GBA -> fPKG de PS4 con pemu (pNES = Nestopia, pSNES = Snes9x, pGBA = mGBA),
-emuladores libres (GPL-3.0) para PS4 que vienen incluidos en emus/. La versión incluida tiene un parche
+"""NES, SNES, GBA y Genesis -> fPKG de PS4 con pemu (pNES = Nestopia, pSNES = Snes9x,
+pGBA = mGBA, pGEN = Genesis Plus GX), emuladores libres para PS4 que vienen incluidos en emus/. La versión incluida tiene un parche
 (tools/pemu-autoboot.patch) para arrancar directo el juego del paquete: cada fPKG es un
 juego con su icono en el menú de la PS4, y al salir del juego se vuelve al menú."""
 
@@ -32,6 +32,14 @@ SYSTEMS = {
                    (".sfc", ".smc", ".fig", ".swc", ".bs", ".zip")),
     # mGBA también lee Game Boy y Game Boy Color.
     "gba": System("gba", "Game Boy Advance", "pgba.zip", "GBAF", "GBAFPKG0", (".gba", ".gb", ".gbc", ".zip")),
+    # Genesis Plus GX también lee Master System, Game Gear y SG-1000.
+    "genesis": System("genesis", "Mega Drive / Genesis", "pgen.zip", "MDFP", "MDFPKG00",
+                      (".md", ".gen", ".smd", ".bin", ".mdx", ".sms", ".gg", ".sg", ".zip")),
+}
+# Consola de cada extensión (para la carátula y el subtítulo del icono).
+VARIANTS = {
+    ".gb": ("gb", "Game Boy"), ".gbc": ("gbc", "Game Boy Color"),
+    ".sms": ("sms", "Master System"), ".gg": ("gg", "Game Gear"), ".sg": ("sg1000", "SG-1000"),
 }
 GB_LOGO = bytes.fromhex("CEED6666")  # inicio del logo de Nintendo en la cabecera (0x104) de Game Boy
 
@@ -54,7 +62,7 @@ VIDEO_LABELS = {
 
 @dataclasses.dataclass
 class Options:
-    system: str                 # "nes" | "snes" | "gba"
+    system: str                 # "nes" | "snes" | "gba" | "genesis"
     rom: str
     output_dir: str
     title: str = ""
@@ -104,6 +112,8 @@ def check_rom(system, path):
             f.seek(0x104)
             if f.read(4) != GB_LOGO:
                 raise BuildError(f"{os.path.basename(path)} no tiene la cabecera de Game Boy.")
+    elif system.key == "genesis" and ext != ".zip" and os.path.getsize(path) < 1024:
+        raise BuildError(f"{os.path.basename(path)} es demasiado pequeño para una ROM de Sega.")
 
 
 def base_dir(system, explicit=""):
@@ -171,8 +181,7 @@ def build(opts, log=print, progress=None):
     log(f"Imagen: {VIDEO_LABELS[opts.video]}")
 
     ext = os.path.splitext(opts.rom)[1].lower()
-    cover_system = {".gb": "gb", ".gbc": "gbc"}.get(ext, system.key) if system.key == "gba" else system.key
-    subtitle = {".gb": "Game Boy", ".gbc": "Game Boy Color"}.get(ext, system.name) if system.key == "gba" else system.name
+    cover_system, subtitle = VARIANTS.get(ext, (system.key, system.name))
     cover = covers.resolve(opts, cover_system, names=[os.path.basename(opts.rom), opts.title], log=log)
     return pkg.build(title=title, title_id=title_id, icon=opts.icon, background=opts.background, cover=cover,
                      subtitle=subtitle, pkgtool=opts.pkgtool, gp4_only=opts.gp4_only,

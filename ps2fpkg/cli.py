@@ -6,7 +6,9 @@
     python -m ps2fpkg nes JUEGO.nes [opciones]                 NES
     python -m ps2fpkg snes JUEGO.sfc [opciones]                SNES
     python -m ps2fpkg gba JUEGO.gba [opciones]                 GBA (también Game Boy / Color)
+    python -m ps2fpkg genesis JUEGO.md [opciones]              Genesis (también Master System / Game Gear)
     python -m ps2fpkg dc JUEGO.gdi [opciones]                  Dreamcast (GDI, CHD, CDI o CUE)
+    python -m ps2fpkg gc JUEGO.rvz [opciones]                  GameCube / Wii
     python -m ps2fpkg instalar JUEGO.pkg --ps4 IP              instalar por red con GoldHEN
 """
 
@@ -14,9 +16,9 @@ import argparse
 import sys
 import time
 
-from . import builder, cue, dreamcast, emu, install, iso, ps1, psp, retro
+from . import builder, cue, dreamcast, emu, gamecube, install, iso, ps1, psp, retro
 
-SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes", "gba", "dc")
+SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes", "gba", "genesis", "dc", "gc")
 
 
 def _cover_args(p):
@@ -82,6 +84,11 @@ def parse_system(cmd, argv):
         p.add_argument("--mostrar-fps", dest="show_fps", action="store_true", help="mostrar los FPS")
         p.add_argument("--bios", default="", metavar="CARPETA",
                        help="carpeta con dc_boot.bin y dc_flash.bin de tu Dreamcast (opcional)")
+    elif cmd == "gc":
+        p = argparse.ArgumentParser(prog="ps2fpkg gc", description="Convierte un juego de GameCube o Wii en fPKG "
+                                    "de PS4 con DolphinPS4 (incluido): el juego arranca directo desde el menú.")
+        p.add_argument("discos", nargs="+", help="disco(s) en orden (" + ", ".join(gamecube.EXTENSIONS) + ")")
+        p.add_argument("--serial", default="", help="ID del juego, p. ej. GALE01 (por defecto se lee del disco)")
     else:
         system = retro.SYSTEMS[cmd]
         p = argparse.ArgumentParser(prog=f"ps2fpkg {cmd}", description=f"Convierte una ROM de {system.name} "
@@ -96,7 +103,8 @@ def parse_system(cmd, argv):
     _common(p, emu_required=False,
             emu_help=("carpeta de un " + {"ps1": "PS1 Classic", "psp": "PSP Classic"}[cmd] + " de PS4 extraído; "
                       f"por defecto la de emuladores/{cmd}") if cmd in ("ps1", "psp")
-            else "base de Resonance propia (opcional)" if cmd == "dc" else "pemu propio (opcional)")
+            else {"dc": "base de Resonance propia (opcional)", "gc": "base de DolphinPS4 propia (opcional)"}.get(
+                cmd, "pemu propio (opcional)"))
     return p.parse_args(argv)
 
 
@@ -114,6 +122,8 @@ def system_options(cmd, a):
     if cmd == "dc":
         return dreamcast, dreamcast.Options(game=a.juego, resolution=a.resolucion, widescreen=a.widescreen,
                                             show_fps=a.show_fps, bios_dir=a.bios, **common)
+    if cmd == "gc":
+        return gamecube, gamecube.Options(discs=a.discos, serial=a.serial, **common)
     return retro, retro.Options(system=cmd, rom=a.rom, video=a.imagen, audio_sync=getattr(a, "audio_sync", True),
                                 show_fps=a.show_fps, **common)
 
@@ -122,7 +132,7 @@ def parse_convert(argv):
     p = argparse.ArgumentParser(
         prog="ps2fpkg",
         description="Convierte ISOs de PS2 en fPKG de PS4 (PS2 Classics). Otras consolas: "
-                    "'ps2fpkg ps1|psp|nes|snes|gba|dc --help'. Instalar por red: 'ps2fpkg instalar --help'.",
+                    "'ps2fpkg ps1|psp|nes|snes|gba|genesis|dc|gc --help'. Instalar por red: 'ps2fpkg instalar --help'.",
     )
     p.add_argument("iso", nargs="+", help="ISO(s) del juego, en orden de disco (también acepta BIN de 2352 bytes/sector)")
     p.add_argument("-e", "--emu", default="",

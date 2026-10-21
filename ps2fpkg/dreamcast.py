@@ -1,5 +1,5 @@
 """Dreamcast (GDI, CHD, CDI o CUE/BIN) -> fPKG de PS4 con Resonance (Flycast para PS4,
-GPL-2.0), incluido en emus/resonance.zip (ver tools/build_resonance.py).
+GPL-2.0), incluido en emus/resonance.zip (ver tools/build_launched_emus.py).
 
 El paquete lleva Resonance, el juego en autoboot/ y un lanzador propio como eboot.bin: lee
 autoboot/args.txt y arranca Resonance con las opciones de imagen y la ruta del juego, así que

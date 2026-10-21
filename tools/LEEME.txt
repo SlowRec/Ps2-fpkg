@@ -4,5 +4,5 @@ tools/linux-x64/ eboot_decrypt para Linux (incluido). PkgTool: python tools/buil
 Scripts para recompilar todo desde el código fuente:
   build_pkgtool.py    PkgTool (LibOrbisPkg, LGPL-3.0) con la corrección de PlayGo para juegos grandes
   build_pspdecrypt.py eboot_decrypt (PrxDecrypter de pspdecrypt, GPL-3.0) para juegos de PSP
-  build_pemu.py       emus/pnes.zip, emus/psnes.zip y emus/pgba.zip (pemu, GPL-3.0) con pemu-autoboot.patch
-  build_resonance.py  emus/resonance.zip (Resonance, GPL-2.0) con el lanzador de dc-launcher/
+  build_pemu.py       emus/pnes.zip, psnes.zip, pgba.zip y pgen.zip (pemu) con pemu-autoboot.patch
+  build_launched_emus.py  emus/resonance.zip y emus/dolphin.zip (GPL-2.0) con el lanzador de dc-launcher/

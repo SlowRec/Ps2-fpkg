@@ -1,5 +1,6 @@
 """Búsqueda de carátulas: por serial (PS1/PS2, colecciones de xlenore que usan PCSX2 y
-DuckStation) y por nombre en las carátulas de libretro (todas las consolas)."""
+DuckStation; GameCube/Wii, GameTDB como Dolphin) y por nombre en las carátulas de libretro
+(todas las consolas)."""
 
 import difflib
 import os
@@ -16,6 +17,12 @@ LIBRETRO_SYSTEMS = {
     "gb": "Nintendo - Game Boy",
     "gbc": "Nintendo - Game Boy Color",
     "dc": "Sega - Dreamcast",
+    "genesis": "Sega - Mega Drive - Genesis",
+    "sms": "Sega - Master System - Mark III",
+    "gg": "Sega - Game Gear",
+    "sg1000": "Sega - SG-1000",
+    "gc": "Nintendo - GameCube",
+    "wii": "Nintendo - Wii",
     "ps1": "Sony - PlayStation",
     "ps2": "Sony - PlayStation 2",
     "psp": "Sony - PlayStation Portable",
@@ -23,7 +30,12 @@ LIBRETRO_SYSTEMS = {
 SERIAL_COVERS = {
     "ps2": "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/{serial}.jpg",
     "ps1": "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/{serial}.jpg",
+    "gc": "https://art.gametdb.com/wii/cover/{region}/{serial}.png",
+    "wii": "https://art.gametdb.com/wii/cover/{region}/{serial}.png",
 }
+# Región de GameTDB según la 4.ª letra del ID de GameCube/Wii (GALE01 -> E -> US).
+GAMETDB_REGIONS = {"E": "US", "N": "US", "J": "JA", "K": "KO", "W": "ZH", "D": "DE", "F": "FR", "S": "ES",
+                   "I": "IT", "H": "NL", "U": "AU"}
 INDEX_MAX_AGE = 7 * 24 * 3600
 REGION_ORDER = ("usa", "world", "europe", "spain", "japan")
 BAD_TAGS = ("beta", "proto", "demo", "sample", "kiosk", "pirate", "unl", "hack")
@@ -108,10 +120,12 @@ def find(system, serial="", names=(), log=print):
     """Descarga la carátula y devuelve su ruta local, o None. `names`: nombres a probar
     (nombre del archivo del juego, título…), del más fiable al menos."""
     if serial and system in SERIAL_COVERS:
-        data = db._fetch(SERIAL_COVERS[system].format(serial=serial), os.path.join("covers", "serial", f"{serial}.jpg"))
+        url = SERIAL_COVERS[system].format(serial=serial, region=GAMETDB_REGIONS.get(serial[3:4], "EN"))
+        name = serial + os.path.splitext(url)[1]
+        data = db._fetch(url, os.path.join("covers", "serial", name))
         if data:
             log(f"Carátula: encontrada por serial ({serial}).")
-            return _save(data, f"{serial}.jpg")
+            return _save(data, name)
     if system not in LIBRETRO_SYSTEMS:
         return None
     index = libretro_index(system)

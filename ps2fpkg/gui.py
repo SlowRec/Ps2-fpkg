@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 import subprocess
 import sys
 
-from . import __version__, builder, covers, dreamcast, emu, images, install, ps1, psp, retro
+from . import __version__, builder, covers, dreamcast, emu, gamecube, images, install, ps1, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -76,6 +76,13 @@ def _dc_options(v, files, flags, quality, _args):
         pkgtool=v["pkgtool"], gp4_only=v["gp4_only"], resolution=quality, **flags)
 
 
+def _gc_options(v, files, _flags, _quality, _args):
+    return gamecube, gamecube.Options(
+        discs=files, output_dir=v["output_dir"], title=v["title"], serial=v["serial"], icon=v["icon"],
+        background=v["background"], cover=v["cover"], find_cover=not v["cover"], pkgtool=v["pkgtool"],
+        gp4_only=v["gp4_only"])
+
+
 SPECS = [
     (Spec("ps2", "PS2", "Discos (ISO/BIN, en orden)", [("Imágenes de disco", "*.iso *.bin *.img"), ("Todos", "*")],
           True, "emulador de un PS2 Classic de PS4", builder.detect_serial,
@@ -111,6 +118,11 @@ SPECS = [
           flags=(("show_fps", "Mostrar FPS", False),),
           note="Emulador incluido (mGBA); también acepta Game Boy y Game Boy Color. "
                "El juego arranca directo desde el menú de la PS4."), _retro_options("gba")),
+    (Spec("genesis", "Genesis", "ROM", [("Sega", "*.md *.gen *.smd *.bin *.mdx *.sms *.gg *.sg *.zip"), ("Todos", "*")],
+          False, quality={v: k for k, v in retro.VIDEO_LABELS.items()}, quality_label="Imagen",
+          flags=(("show_fps", "Mostrar FPS", False),),
+          note="Emulador incluido (Genesis Plus GX); también acepta Master System, Game Gear y SG-1000. "
+               "El juego arranca directo desde el menú de la PS4."), _retro_options("genesis")),
     (Spec("dc", "Dreamcast", "Juego (GDI, CHD, CDI o CUE)",
           [("Dreamcast", "*.gdi *.chd *.cdi *.cue"), ("Todos", "*")], False,
           quality={v: k for k, v in dreamcast.RESOLUTION_LABELS.items()}, quality_label="Resolución",
@@ -118,6 +130,11 @@ SPECS = [
           extra_files=(("bios", "BIOS dc_boot.bin", [("BIOS de Dreamcast", "dc_boot.bin *.bin"), ("Todos", "*")]),),
           note="Emulador incluido (Resonance, basado en Flycast). En el juego, L3 + R3 abre el menú de "
                "partidas guardadas y ajustes. La BIOS es opcional."), _dc_options),
+    (Spec("gc", "GameCube/Wii", "Discos (en orden)",
+          [("GameCube / Wii", "*.rvz *.iso *.gcm *.gcz *.ciso *.wia *.wbfs *.tgc *.wad *.dol *.elf"), ("Todos", "*")],
+          True, detect=gamecube.detect_serial,
+          note="Emulador incluido (DolphinPS4). Los ajustes de imagen de Dolphin ya vienen probados en PS4; "
+               "en el juego, L3 + R3 abre el menú (partidas guardadas, ajustes por juego, trucos)."), _gc_options),
 ]
 
 PS3_NOTE = ("PlayStation 3 no está disponible: todavía no existe un emulador de PS3 que funcione en PS4. "
@@ -212,11 +229,13 @@ class SystemTab(ttk.Frame):
         self.vars["cover"].trace_add("write", lambda *_: self._show_preview())
 
         q = ttk.LabelFrame(self, text="Calidad de imagen y sonido", padding=8)
-        q.grid(row=row, column=0, columnspan=5, sticky="ew", pady=(8, 2))
+        if s.quality or s.flags or s.extra_files or s.emu_args:
+            q.grid(row=row, column=0, columnspan=5, sticky="ew", pady=(8, 2))
         q.columnconfigure(1, weight=1)
-        ttk.Label(q, text=s.quality_label).grid(row=0, column=0, sticky="w")
-        ttk.Combobox(q, textvariable=self.quality, values=list(s.quality), state="readonly"
-                     ).grid(row=0, column=1, columnspan=2, sticky="ew", pady=2)
+        if s.quality:
+            ttk.Label(q, text=s.quality_label).grid(row=0, column=0, sticky="w")
+            ttk.Combobox(q, textvariable=self.quality, values=list(s.quality), state="readonly"
+                         ).grid(row=0, column=1, columnspan=2, sticky="ew", pady=2)
         if s.flags:
             checks = ttk.Frame(q)
             checks.grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
@@ -233,7 +252,7 @@ class SystemTab(ttk.Frame):
             self.emu_args.grid(row=qrow, column=1, columnspan=2, sticky="ew", pady=2)
         row += 1
         if s.note:
-            ttk.Label(self, text=s.note, foreground="#555").grid(row=row, column=0, columnspan=5, sticky="w", pady=(6, 0))
+            ttk.Label(self, text=s.note, foreground="#555", wraplength=820, justify="left").grid(row=row, column=0, columnspan=5, sticky="w", pady=(6, 0))
 
     # --- Selección de archivos -----------------------------------------
     def _pick_dir(self, key):
@@ -322,8 +341,9 @@ class SystemTab(ttk.Frame):
                 except Exception:  # noqa: BLE001 — el título es opcional
                     pass
             if not self.vars["title"].get():
-                self.vars["title"].set(dreamcast.default_title(path) if self.spec.key == "dc"
-                                       else retro.clean_title(path))
+                title = {"dc": dreamcast.default_title, "gc": gamecube.default_title}.get(
+                    self.spec.key, retro.clean_title)(path)
+                self.vars["title"].set(title)
         if self.spec.detect:
             try:
                 serial = self.spec.detect(path)

@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import covers, cue, dreamcast, emu, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
+from ps2fpkg import covers, cue, dreamcast, emu, gamecube, images, iso, pkgbuild, ps1, psp, retro, sfo  # noqa: E402
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -289,6 +289,75 @@ class RetroTests(Base):
         write(bad, bytes(1024))
         with self.assertRaisesRegex(pkgbuild.BuildError, "cabecera de GBA"):
             retro.build(retro.Options(system="gba", rom=bad, output_dir=self.out, gp4_only=True))
+
+
+    def test_genesis_and_master_system(self):
+        md = os.path.join(self.dir, "Sonic The Hedgehog (USA, Europe).md")
+        write(md, bytes(0x100) + b"SEGA MEGA DRIVE " + bytes(512 * 1024))
+        gp4 = retro.build(retro.Options(system="genesis", rom=md, output_dir=self.out, gp4_only=True),
+                          log=lambda m: None)
+        files = gp4_files(gp4)
+        self.assertEqual(read(files["autoboot/rom.txt"]), "Sonic The Hedgehog (USA, Europe).md\n")
+        self.assertRegex(ET.parse(gp4).getroot().find("volume/package").get("content_id"),
+                         r"^IV0001-MDFP\d{5}_00-[0-9A-F]{8}MDFPKG00$")
+        sms = os.path.join(self.dir, "Alex Kidd (USA).sms")
+        write(sms, bytes(128 * 1024))
+        files = gp4_files(retro.build(retro.Options(system="genesis", rom=sms, output_dir=self.out, gp4_only=True),
+                                      log=lambda m: None))
+        self.assertIn("autoboot/Alex Kidd (USA).sms", files)
+
+
+class GameCubeTests(Base):
+    def make_disc(self, path, game_id=b"GALE01", wii=False, offset=0):
+        head = bytearray(0x400)
+        head[offset:offset + 6] = game_id
+        if wii:
+            head[offset + 0x18:offset + 0x1C] = gamecube.WII_MAGIC
+        else:
+            head[offset + 0x1C:offset + 0x20] = gamecube.GC_MAGIC
+        head[offset + 0x20:offset + 0x20 + 19] = b"Super Smash Bros. M"
+        write(path, bytes(head) + bytes(1024 * 1024))
+
+    def test_iso_project(self):
+        disc = os.path.join(self.dir, "Super Smash Bros. Melee (USA).iso")
+        self.make_disc(disc)
+        self.assertEqual(gamecube.read_header(disc), ("GALE01", "Super Smash Bros. M", "gc"))
+        gp4 = gamecube.build(gamecube.Options(discs=[disc], output_dir=self.out, gp4_only=True), log=lambda m: None)
+        files = gp4_files(gp4)
+        for name in ("eboot.bin", "dolphin/eboot.bin", "sce_module/libc.prx", "Sys/codehandler.bin",
+                     "autoboot/game/Super Smash Bros. Melee (USA).iso"):
+            self.assertIn(name, files)
+        self.assertEqual(read(files["xmb/version.txt"]).strip(), "99.99")
+        self.assertEqual(read(files["autoboot/dolphin.txt"]),
+                         "/app0/autoboot/game/Super Smash Bros. Melee (USA).iso\n")
+        with open(files["sce_sys/param.sfo"], "rb") as f:
+            param = sfo.parse(f.read())
+        self.assertEqual(param["TITLE"], "Super Smash Bros. Melee")
+        self.assertRegex(param["CONTENT_ID"], r"^IV0001-GCFP\d{5}_00-[0-9A-F]{8}GCFPKG00$")
+
+    def test_rvz_two_discs_and_wii(self):
+        d1, d2 = (os.path.join(self.dir, f"Tales{n}.rvz") for n in (1, 2))
+        self.make_disc(d1, b"GTOE8P", offset=0x58)
+        self.make_disc(d2, b"GTOE8P", offset=0x58)
+        self.assertEqual(gamecube.detect_serial(d1), "GTOE8P")
+        files = gp4_files(gamecube.build(gamecube.Options(discs=[d1, d2], output_dir=self.out, gp4_only=True),
+                                         log=lambda m: None))
+        self.assertIn("autoboot/game/Tales1 (Disc 1).rvz", files)
+        self.assertIn("autoboot/game/Tales2 (Disc 2).rvz", files)
+        self.assertEqual(read(files["autoboot/dolphin.txt"]), "/app0/autoboot/game/Tales1 (Disc 1).rvz\n")
+        wii = os.path.join(self.dir, "Juego Wii.wbfs")
+        self.make_disc(wii, b"RSPE01", wii=True, offset=0x200)
+        self.assertEqual(gamecube.read_header(wii)[2], "wii")
+        with self.assertRaisesRegex(pkgbuild.BuildError, "formato"):
+            gamecube.build(gamecube.Options(discs=[self.out + ".nds"], output_dir=self.out, gp4_only=True))
+
+    @unittest.skipUnless(REAL_PKGTOOL, "define PS2FPKG_PKGTOOL")
+    def test_real_pkg(self):
+        disc = os.path.join(self.dir, "Juego.iso")
+        self.make_disc(disc)
+        root = self.extract(gamecube.build(gamecube.Options(discs=[disc], output_dir=self.out), log=lambda m: None))
+        self.assertEqual(read(os.path.join(root, "dolphin", "eboot.bin"), "rb")[:4], bytes.fromhex("4f153d1d"))
+        self.assertTrue(os.path.isfile(os.path.join(root, "autoboot", "game", "Juego.iso")))
 
 
 class DreamcastTests(Base):

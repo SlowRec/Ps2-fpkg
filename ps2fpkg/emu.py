@@ -72,7 +72,7 @@ def prepare_default_dirs():
                         "  ps2\\  -> de un PS2 Classic de PS4\n"
                         "  ps1\\  -> de un PS1 Classic de PS4 (PlayStation Plus)\n"
                         "  psp\\  -> de un PSP Classic de PS4 (PlayStation Plus)\n"
-                        "La app los usa sola y no vuelve a pedirlos. NES, SNES, GBA y Dreamcast no necesitan nada.\n")
+                        "La app los usa sola y no vuelve a pedirlos. Las demás consolas no necesitan nada.\n")
     except OSError:
         pass
     return root

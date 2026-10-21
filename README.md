@@ -1,8 +1,10 @@
 # PS Classics → fPKG de PS4
 
-Convierte juegos de **PS2, PS1, PSP, NES, SNES, GBA y Dreamcast** en **fPKG de PS4**, cada uno con su icono en
+Convierte juegos de **PS2, PS1, PSP, NES, SNES, GBA, Genesis, Dreamcast y GameCube/Wii** en **fPKG de PS4**, cada uno con su icono en
 el menú de la consola, optimizados para verse y sonar lo mejor posible y listos para instalar
 con **GoldHEN** (por USB o directamente por la red).
+
+📖 **[Tutorial paso a paso para cada consola](TUTORIAL.md)** (también se publica junto al .exe).
 
 | Consola | Emulador en la PS4 | Entrada | Lo que aporta tu PC |
 | --- | --- | --- | --- |
@@ -12,12 +14,14 @@ con **GoldHEN** (por USB o directamente por la red).
 | NES | pNES (Nestopia) — **incluido** | `.nes`, `.fds`, `.zip` | nada más |
 | SNES | pSNES (Snes9x) — **incluido** | `.sfc`, `.smc`, `.zip` | nada más |
 | GBA | pGBA (mGBA) — **incluido** | `.gba`, `.gb`, `.gbc`, `.zip` | nada más (también Game Boy y Game Boy Color) |
+| Genesis | pGEN (Genesis Plus GX) — **incluido** | `.md`, `.gen`, `.smd`, `.bin`, `.zip` | nada más (también Master System, Game Gear y SG-1000) |
 | Dreamcast | Resonance (Flycast) — **incluido** | `.gdi`, `.chd`, `.cdi`, `.cue` | nada más (BIOS opcional) |
+| GameCube / Wii | DolphinPS4 (Dolphin) — **incluido** | `.rvz`, `.iso`, `.gcz`, `.wbfs`, `.wad`… | nada más |
 | N64 · PS3 | — | — | **no disponibles** (ver abajo) |
 
 > **Importante:** esta herramienta **no incluye archivos de Sony**. Los emuladores de PS1, PS2 y
 > PSP salen de juegos clásicos de PS4 que tengas tú, y los juegos deben ser copias de los tuyos.
-> Los emuladores incluidos (NES, SNES, GBA y Dreamcast) son software libre (GPL).
+> Los emuladores incluidos (NES, SNES, GBA, Genesis, Dreamcast y GameCube/Wii) son software libre.
 
 ## Menú dentro del juego: partidas guardadas y pantalla
 
@@ -25,8 +29,9 @@ con **GoldHEN** (por USB o directamente por la red).
 | --- | --- | --- |
 | PS1 | botón **OPTIONS** | estados guardados (varias ranuras), **rebobinar**, presets visuales y el menú **Gráficos** (resolución, filtro Lanczos/cúbico, antialiasing), que la app deja activado |
 | PSP | el menú del emulador de PlayStation Plus (como en PS1) | estados guardados y **rebobinar**; la calidad de imagen se elige en la app antes de crear el PKG |
-| NES / SNES / GBA | **L1 + R1** | 4 ranuras de estados guardados (con miniatura), escalado, filtro, shader, mandos y salir. Al empezar el juego aparece el aviso «L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA» |
+| NES / SNES / GBA / Genesis | **L1 + R1** | 4 ranuras de estados guardados (con miniatura), escalado, filtro, shader, mandos y salir. Al empezar el juego aparece el aviso «L1 + R1: MENU DE PARTIDAS GUARDADAS Y PANTALLA» |
 | Dreamcast | **L3 + R3** | 10 ranuras de estados guardados con miniatura, trucos y parches, cambiar disco, ajustes de imagen (resolución, pantalla ancha, filtrado, *Frame Generation*) y cerrar el juego. Las memorias VMU funcionan como en la consola |
+| GameCube / Wii | **L3 + R3** | 8 ranuras de estados guardados, todos los ajustes de Dolphin (globales o solo para ese juego), trucos Action Replay/Gecko y salir. Tarjetas de memoria como en la consola |
 | PS2 | — | el emulador de PS2 de Sony **no trae menú**: las partidas se guardan en la tarjeta de memoria virtual desde el propio juego, y la pantalla se configura en la app antes de crear el PKG |
 
 En PS2 se podría construir un menú propio con funciones internas del emulador, pero no están
@@ -81,7 +86,7 @@ emulador no admite, se omite completo en lugar de aplicarlo a medias.
 | Arte del UMD | ✓ | Usa el icono y el fondo del propio juego si no eliges otros. |
 | EBOOT descifrado | ✓ | El emulador lo necesita: se descifra automáticamente (no se toca tu ISO original). |
 
-**NES, SNES y GBA**
+**NES, SNES, GBA y Genesis**
 
 | Imagen | Qué hace |
 | --- | --- |
@@ -104,6 +109,13 @@ se pueden cambiar desde el menú del emulador en la PS4.
 
 La resolución y la pantalla ancha elegidas en la app mandan en ese paquete; con *Original* se
 usan las de los ajustes de Resonance (que se pueden cambiar en el juego con L3 + R3).
+
+**GameCube / Wii**
+
+DolphinPS4 trae ajustes ya probados en una PS4 normal (y correcciones para algunos juegos), con
+reloj de CPU automático y límite de FPS *Auto (60/30)* para que los juegos pesados no se
+ralenticen. La resolución (hasta 3x), el filtrado y demás se cambian en el juego con L3 + R3,
+para todos los juegos o solo para ese.
 
 **Sobre el sonido:** todos los emuladores reproducen el audio original de cada consola; no hay
 un ajuste que lo "mejore" más allá de que suene completo y sin cortes, que es lo que se asegura
@@ -140,7 +152,7 @@ Sus pestañas en la app lo explican; si aparece un emulador que funcione, se pod
    ```
 
    Desde entonces la app los usa sola y no los vuelve a pedir (cada pestaña muestra
-   «✓ Listo» o el botón **Abrir carpeta**). NES, SNES, GBA y Dreamcast no necesitan nada.
+   «✓ Listo» o el botón **Abrir carpeta**). Las demás consolas no necesitan nada.
    Para obtener la carpeta: vuelca el juego instalado en tu PS4 con un *dumper* de aplicaciones,
    o extrae un fPKG que ya tengas:
    `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`
@@ -156,7 +168,8 @@ Sus pestañas en la app lo explican; si aparece un emulador que funcione, se pod
 
 Descarga **PS-Classics-fPKG.exe** desde [Releases](https://github.com/SlowRec/ps2-fpkg/releases/latest)
 y ábrelo con doble clic: no hace falta instalar Python ni nada más (incluye PkgTool, eboot_decrypt
-y los emuladores de NES, SNES, GBA y Dreamcast). La primera vez tarda unos segundos en abrir.
+y los emuladores de NES, SNES, GBA, Genesis, Dreamcast y GameCube/Wii). La primera vez tarda unos
+segundos en abrir.
 Si Windows SmartScreen avisa, elige *Más información → Ejecutar de todas formas*.
 
 El .exe se crea automáticamente en GitHub Actions (`.github/workflows/windows-exe.yml`): pasa
@@ -166,7 +179,7 @@ todas las pruebas en Windows, crea un PKG de prueba con el propio .exe y lo veri
 
 Con el .exe: doble clic. Desde el código: `PS2-fPKG.bat` en Windows o `python -m ps2fpkg`.
 
-1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES, GBA, Dreamcast).
+1. Elige la **pestaña** de la consola (PS2, PS1, PSP, NES, SNES, GBA, Genesis, Dreamcast, GameCube/Wii).
 2. Agrega el juego (el serial, el nombre y la carátula se detectan solos). Cambia el nombre o
    la carátula si quieres. En PS1/PS2/PSP el emulador ya no se pide: se usa el de `emuladores\`.
 3. Revisa **Calidad de imagen y sonido** (ya viene en máxima).
@@ -185,10 +198,12 @@ python -m ps2fpkg nes "Super Mario Bros. (World).nes" -o salida
 python -m ps2fpkg snes "Super Metroid (USA).sfc" -o salida --imagen crt --instalar-en 192.168.1.50
 python -m ps2fpkg nes "zelda.nes" -t "Zelda (mi copia)" --caratula portada.jpg
 python -m ps2fpkg gba "Metroid Fusion (USA).gba" -o salida
+python -m ps2fpkg genesis "Streets of Rage 2 (USA).md" -o salida --imagen crt
 python -m ps2fpkg dc "Sonic Adventure (USA)/disc.gdi" -o salida --resolucion maxima
+python -m ps2fpkg gc "Super Mario Sunshine (USA).rvz" -o salida
 ```
 
-`python -m ps2fpkg ps1 --help` (o `ps2`, `psp`, `nes`, `snes`, `gba`, `dc`) muestra todas las opciones.
+`python -m ps2fpkg ps1 --help` (o `ps2`, `psp`, `nes`, `snes`, `gba`, `genesis`, `dc`, `gc`) muestra todas las opciones.
 
 ## Instalar en la PS4 con GoldHEN
 
@@ -220,7 +235,8 @@ debe estar en **exFAT** (FAT32 no admite archivos tan grandes); la app avisa cua
   (`tools/pemu-autoboot.patch`) para que, al abrir el juego desde el menú de la PS4, cargue esa
   ROM directamente con los ajustes de imagen elegidos, que al salir del juego se cierre, y que
   el aviso inicial indique en PS4 cómo abrir el menú (L1 + R1).
-  GBA igual, con pGBA (mGBA). Partidas guardadas: `/data/pnes`, `/data/psnes` y `/data/pgba` en la PS4.
+  GBA y Genesis igual, con pGBA (mGBA) y pGEN (Genesis Plus GX). Partidas guardadas: `/data/pnes`,
+  `/data/psnes`, `/data/pgba` y `/data/pgen` en la PS4.
 - **Dreamcast:** Resonance (Flycast para PS4) con el juego en `autoboot/game/`. El `eboot.bin` del
   paquete es un lanzador propio (`tools/dc-launcher/main.c`) que lee `autoboot/args.txt` y arranca
   Resonance (`resonance/eboot.bin`) con las opciones de imagen y la ruta del juego; Flycast lo
@@ -229,6 +245,11 @@ debe estar en **exFAT** (FAT32 no admite archivos tan grandes); la app avisa cua
   declara como versión 99.99 para que Resonance no cambie a una actualización descargada en
   `/data/Resonance/app` (que arrancaría sin el juego): si tenías una ahí, se descarta y la app
   Resonance la vuelve a ofrecer.
+- **GameCube/Wii:** DolphinPS4 con los discos en `autoboot/game/`. DolphinPS4 no lee argumentos:
+  arranca el juego que nombra `/data/DolphinPS4/launch.txt`. El mismo lanzador escribe ahí la ruta
+  del juego del paquete (`autoboot/dolphin.txt`) y abre Dolphin (`dolphin/eboot.bin`); al salir
+  del juego, Dolphin deja `to-menu.txt` y reabre el lanzador, que entonces cierra la app en lugar
+  de mostrar el menú de Dolphin. Datos en `/data/DolphinPS4`, versión 99.99 como en Dreamcast.
 
 En todas: `sce_sys/param.sfo`, `icon0.png`, `pic0.png`, `pic1.png`, `project.gp4`,
 `PkgTool pkg_build` y después `pkg_validate`.
@@ -240,13 +261,15 @@ python -m unittest discover tests
 ```
 
 Definiendo `PS2FPKG_PKGTOOL` con la ruta a PkgTool, las pruebas crean PKG reales de PS1, PS2,
-SNES y Dreamcast, los verifican, los extraen y comprueban su contenido.
+SNES, Dreamcast y GameCube, los verifican, los extraen y comprueban su contenido.
 
 ## Licencias y créditos
 
 - [LibOrbisPkg](https://github.com/maxton/LibOrbisPkg) (LGPL-3.0) — creación de PKG; corrección de PlayGo en `tools/build_pkgtool.py`.
-- [pemu](https://github.com/Cpasjuste/pemu) (GPL-3.0) — emuladores de NES, SNES y GBA incluidos en `emus/`; código del parche en `tools/pemu-autoboot.patch` y compilación en `tools/build_pemu.py`.
-- [Resonance](https://github.com/iHaiDeeZ/Resonance) (GPL-2.0), basado en [Flycast](https://github.com/flyinghead/flycast) — emulador de Dreamcast incluido en `emus/resonance.zip` (versión v01.41 publicada, sin cambios; código fuente en su repositorio); preparación en `tools/build_resonance.py`.
+- [pemu](https://github.com/Cpasjuste/pemu) (GPL-3.0) — emuladores de NES, SNES, GBA y Genesis incluidos en `emus/`; código del parche en `tools/pemu-autoboot.patch` y compilación en `tools/build_pemu.py`. El de Genesis usa [Genesis Plus GX](https://github.com/ekeeke/Genesis-Plus-GX) (licencia propia no comercial: `emus/genesis-plus-gx-LICENSE.txt`).
+- [Resonance](https://github.com/iHaiDeeZ/Resonance) (GPL-2.0), basado en [Flycast](https://github.com/flyinghead/flycast) — emulador de Dreamcast incluido en `emus/resonance.zip` (versión v01.41 publicada, sin cambios; código fuente en su repositorio).
+- [DolphinPS4](https://github.com/iHaiDeeZ/DolphinPS4) (GPL-2.0), basado en [Dolphin](https://dolphin-emu.org) — emulador de GameCube/Wii incluido en `emus/dolphin.zip` (versión v04.16 publicada, sin cambios). Ambos se preparan con `tools/build_launched_emus.py`; el lanzador propio está en `tools/dc-launcher/main.c`.
+- Carátulas de GameCube/Wii por ID en [GameTDB](https://www.gametdb.com/) (como Dolphin); se descargan, no se incluyen.
 - [pspdecrypt](https://github.com/John-K/pspdecrypt) (GPL-3.0) — descifrado del EBOOT de PSP (`tools/build_pspdecrypt.py`).
 - [PCSX2 patches](https://github.com/PCSX2/pcsx2_patches) — parches de imagen de PS2 (se descargan, no se incluyen).
 - [Playstation-2-Classics-Patches-PS4](https://github.com/xXxTheDarkprogramerxXx/Playstation-2-Classics-Patches-PS4) — configuraciones oficiales de PS2 (se descargan, no se incluyen).

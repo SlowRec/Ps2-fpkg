@@ -1,4 +1,5 @@
-"""Recompila las bases de NES, SNES y GBA (emus/pnes.zip, emus/psnes.zip, emus/pgba.zip) desde el código fuente.
+"""Recompila las bases de NES, SNES, GBA y Genesis (emus/pnes.zip, psnes.zip, pgba.zip y pgen.zip)
+desde el código fuente.
 
 pemu (https://github.com/Cpasjuste/pemu, GPL-3.0) con tools/pemu-autoboot.patch: si el paquete
 trae /app0/autoboot/rom.txt, la app arranca ese juego directamente y aplica
@@ -23,12 +24,12 @@ import zipfile
 PEMU = "https://github.com/Cpasjuste/pemu"
 PEMU_COMMIT = "eeb5199ee0657b87f65197cbb043e5014befffbd"
 SUBMODULES = ("external/libcross2d", "external/sscrap", "external/cores/nestopia", "external/cores/snes9x",
-              "external/cores/mgba")
+              "external/cores/mgba", "external/cores/Genesis-Plus-GX")
 PACBREW = "https://pacman.mydedibox.fr/pacbrew/packages/"
 OPENORBIS = "/opt/pacbrew/ps4/openorbis"
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-CORES = {"pnes": "PNES", "psnes": "PSNE", "pgba": "PGBA"}
+CORES = {"pnes": "PNES", "psnes": "PSNE", "pgba": "PGBA", "pgen": "PGEN"}
 
 
 def run(cmd, cwd=None, env=None):
@@ -86,11 +87,11 @@ def main():
         run(["git", "checkout", "-q", "FETCH_HEAD"], cwd=src)
         run(["git", "submodule", "update", "--init", "--depth", "1", *SUBMODULES], cwd=src)
         run(["git", "apply", os.path.join(HERE, "pemu-autoboot.patch")], cwd=src)
-        # Solo NES, SNES y GBA: los demás núcleos necesitan submódulos que no hacen falta aquí.
+        # Sin FBNeo (arcade): necesita un submódulo enorme que no hace falta aquí.
         cmake = os.path.join(src, "CMakeLists.txt")
         with open(cmake) as f:
             text = f.read()
-        for core in ("pfbneo", "pgen"):
+        for core in ("pfbneo",):
             text = text.replace(f"add_subdirectory(src/cores/{core})", f"#add_subdirectory(src/cores/{core})")
         with open(cmake, "w") as f:
             f.write(text)
