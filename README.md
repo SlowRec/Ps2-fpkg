@@ -156,11 +156,13 @@ Sus pestañas en la app lo explican; si aparece un emulador que funcione, se pod
    ```
 
    Desde entonces la app los usa sola (cada pestaña muestra «✓ Listo»). Las demás consolas no
-   necesitan nada. Este método no se ha probado en una PS4: si un emulador traído así no
-   funciona, también se puede copiar a mano una carpeta de emulador con **Abrir carpeta** (un
-   vuelco de *dumper* o un .pkg extraído con
-   `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg carpeta`;
-   la app encuentra `uroot/` sola).
+   necesitan nada. Este método no se ha probado en una PS4.
+
+   Si ya tienes el emulador en un archivo, **Importar…** (o `python -m ps2fpkg importar-emulador
+   ARCHIVO`) lo instala desde una carpeta, el **.pkg** de un clásico (lo extrae con PkgTool), un
+   **.zip** o **.7z**, o el **.exe de otra herramienta que lo lleve dentro**, como PSP-FPKG (la base
+   de PSP va incrustada como .7z: la app la busca en el archivo sin ejecutarlo). Detecta la
+   consola, descarta los discos del juego y firma como fSELF los ejecutables que vengan descifrados.
 5. **Internet** (opcional, PS2): para descargar los parches de PCSX2 y la configuración oficial.
    Se guardan en `~/.ps2fpkg/cache`. Sin internet: `--parches CARPETA` con archivos `.pnach`.
 

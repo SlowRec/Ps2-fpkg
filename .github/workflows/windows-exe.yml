@@ -23,7 +23,7 @@ jobs:
           python-version: "3.12"
 
       - name: Dependencias
-        run: python -m pip install --upgrade pip pillow pyinstaller
+        run: python -m pip install --upgrade pip pillow py7zr pyinstaller
 
       - name: Pruebas (con PkgTool real)
         env:
@@ -38,7 +38,7 @@ jobs:
           --add-data "emus;emus"
           ps_classics_fpkg.py
 
-      - name: Probar el .exe (crea PKG de SNES, Dreamcast y GameCube de prueba)
+      - name: Probar el .exe (PKG de SNES, Dreamcast y GameCube, e importar un emulador)
         shell: pwsh
         run: |
           python -c "open('prueba.sfc', 'wb').write(bytes(512 * 1024)); open('prueba.cdi', 'wb').write(bytes(1024 * 1024))"
@@ -51,6 +51,11 @@ jobs:
             & tools\win-x64\PkgTool.Core.exe pkg_validate $pkg.FullName | Tee-Object -Variable report
             if ($report -match '\[ERROR\]') { throw "El PKG de $($game[0]) creado por el .exe no pasó la verificación" }
           }
+          # Importar un emulador desde un .exe con un .7z dentro (como PSP-FPKG)
+          python -c "import os, py7zr; os.makedirs('b/psphd/sce_module', exist_ok=True); open('b/psphd/eboot.bin', 'wb').write(bytes.fromhex('4f153d1d') + bytes(64)); open('b/psphd/config-title.txt', 'w').write('--antialias=SSAA4x'); z = py7zr.SevenZipFile('b.7z', 'w'); z.writeall('b/psphd', 'psphd'); z.close(); open('Herramienta.exe', 'wb').write(b'MZ' + bytes(4096) + open('b.7z', 'rb').read())"
+          $p = Start-Process dist\PS-Classics-fPKG.exe -ArgumentList 'importar-emulador', 'Herramienta.exe', 'psp' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El .exe no pudo importar el emulador (código $($p.ExitCode))" }
+          if (-not (Test-Path dist\emuladores\psp\eboot.bin)) { throw "El emulador importado no está en emuladores\psp" }
 
       - uses: actions/upload-artifact@v4
         with:

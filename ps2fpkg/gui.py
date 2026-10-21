@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import subprocess
 import sys
 
-from . import __version__, builder, covers, dreamcast, emu, gamecube, images, install, ps1, ps4ftp, psp, retro
+from . import __version__, builder, covers, dreamcast, emu, gamecube, images, importer, install, ps1, ps4ftp, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -215,7 +215,7 @@ class SystemTab(ttk.Frame):
             buttons.grid(row=row, column=2, columnspan=2, sticky="w", padx=(6, 0))
             ttk.Button(buttons, text="Traer de mi PS4", command=self._fetch_emu).grid(row=0, column=0)
             ttk.Button(buttons, text="Abrir carpeta", command=self._open_emu_dir).grid(row=0, column=1, padx=(4, 0))
-            ttk.Button(buttons, text="Otra…", width=6, command=self._pick_emu).grid(row=0, column=2, padx=(4, 0))
+            ttk.Button(buttons, text="Importar…", command=self._import_emu).grid(row=0, column=2, padx=(4, 0))
             self.refresh_emu()
             row += 1
         self._field(row, "Carátula", "cover", lambda: self._pick_file("cover", IMAGES))
@@ -332,12 +332,28 @@ class SystemTab(ttk.Frame):
 
         self.app._run_in_background(work)
 
-    def _pick_emu(self):
-        path = filedialog.askdirectory(initialdir=self.vars["emu_dir"].get() or None)
-        if path:
-            self.vars["emu_dir"].set(path)
-            self.refresh_emu()
-            self.app.remember()
+    def _import_emu(self):
+        """Instala el emulador desde un archivo del usuario: .exe de otra herramienta que lo lleve
+        dentro (p. ej. PSP-FPKG), .pkg de un clásico, .zip o .7z (importer.py)."""
+        path = filedialog.askopenfilename(
+            title=f"Emulador de {emu.SYSTEM_NAMES[self.spec.key]}: .exe, .pkg, .zip o .7z",
+            filetypes=[("Emulador", "*.exe *.pkg *.zip *.7z"), ("Todos", "*")])
+        if not path:
+            return
+
+        def work():
+            try:
+                system, dest = importer.import_base(path, self.spec.key, log=self.app.log_threadsafe)
+                for tab in self.app.tabs:
+                    if tab.spec.key == system:
+                        tab.vars["emu_dir"].set("")
+                        self.app.events.put(("call", tab.refresh_emu))
+                self.app.events.put(("call", self.app.remember))
+                self.app.events.put(("done", f"Emulador de {emu.SYSTEM_NAMES[system]} listo:\n{dest}"))
+            except Exception as e:  # noqa: BLE001 — se muestra al usuario
+                self.app.events.put(("error", str(e)))
+
+        self.app._run_in_background(work)
 
     def _pick_file(self, key, types):
         path = filedialog.askopenfilename(filetypes=types)

@@ -1,14 +1,18 @@
+import importlib.util
+import io
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import covers, cue, dreamcast, emu, fself, gamecube, images, iso, pkgbuild, ps1, ps4ftp, psp, retro, sfo  # noqa: E402
+from ps2fpkg import (covers, cue, dreamcast, emu, fself, gamecube, images, importer, iso, pkgbuild,  # noqa: E402
+                     ps1, ps4ftp, psp, retro, sfo)
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -634,3 +638,69 @@ class FselfTests(unittest.TestCase):
         self.assertEqual(fself.unwrap(data)[0], elf[0x100:])
         with self.assertRaises(fself.FselfError):
             fself.make(b"no es un elf")
+
+
+class ImporterTests(Base):
+    def make_base(self, root, system):
+        write(os.path.join(root, "eboot.bin"), fself.make(make_elf()))
+        write(os.path.join(root, "sce_module", "libc.prx"), make_elf(e_type=0xFE18))   # descifrado: se firma
+        write(os.path.join(root, "sce_sys", "param.sfo"), b"PSF")
+        if system == "ps2":
+            write(os.path.join(root, "config-emu-ps4.txt"), "--gs-uprender=none\n")
+            write(os.path.join(root, "image", "disc01.iso"), b"juego")
+        else:
+            write(os.path.join(root, "config-title.txt"), '--image="data/USER_L0.IMG"\n--antialias=SSAA4x\n'
+                  if system == "psp" else '--image="data/disc1.bin"\n--scale=4\n')
+            write(os.path.join(root, "data", "USER_L0.IMG" if system == "psp" else "disc1.bin"), b"juego")
+
+    def zip_of(self, folder):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for dirpath, _d, files in os.walk(folder):
+                for n in files:
+                    full = os.path.join(dirpath, n)
+                    z.write(full, os.path.join("psphd", os.path.relpath(full, folder)))
+        return buf.getvalue()
+
+    def test_exe_with_embedded_zip(self):
+        src = os.path.join(self.dir, "src")
+        self.make_base(src, "psp")
+        exe = os.path.join(self.dir, "Herramienta.exe")
+        write(exe, b"MZ" + bytes(5000) + self.zip_of(src) + bytes(3000))
+        system, dest = importer.import_base(exe, "psp", dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)
+        self.assertEqual(system, "psp")
+        self.assertEqual(emu.locate(dest), dest)
+        self.assertFalse(os.path.exists(os.path.join(dest, "data", "USER_L0.IMG")))
+        self.assertEqual(read(os.path.join(dest, "sce_module", "libc.prx"), "rb")[:4], fself.SELF_MAGIC)
+        self.assertEqual(read(os.path.join(dest, "eboot.bin"), "rb"), read(os.path.join(src, "eboot.bin"), "rb"))
+
+    def test_folder_zip_and_detection(self):
+        src = os.path.join(self.dir, "extraido", "uroot")
+        self.make_base(src, "ps2")
+        system, dest = importer.import_base(os.path.join(self.dir, "extraido"), "ps1",
+                                            dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)
+        self.assertEqual(system, "ps2")
+        self.assertFalse(os.path.exists(os.path.join(dest, "image")))
+        ps1 = os.path.join(self.dir, "ps1base")
+        self.make_base(ps1, "ps1")
+        z = os.path.join(self.dir, "ps1.zip")
+        write(z, self.zip_of(ps1))
+        self.assertEqual(importer.import_base(z, dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)[0], "ps1")
+        bad = os.path.join(self.dir, "nada.exe")
+        write(bad, b"MZ" + bytes(100))
+        with self.assertRaisesRegex(importer.EmuImportError, "ningún emulador"):
+            importer.import_base(bad, dest_root=self.dir, log=lambda m: None)
+
+    @unittest.skipUnless(importlib.util.find_spec("py7zr"), "instala py7zr")
+    def test_exe_with_embedded_7z(self):
+        import py7zr
+        src = os.path.join(self.dir, "src")
+        self.make_base(src, "psp")
+        archive = os.path.join(self.dir, "base.7z")
+        with py7zr.SevenZipFile(archive, "w") as z:
+            z.writeall(src, "psphd")
+        exe = os.path.join(self.dir, "PSP-FPKG.exe")
+        write(exe, b"MZ" + bytes(4000) + read(archive, "rb") + bytes(2000))
+        system, dest = importer.import_base(exe, dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)
+        self.assertEqual(system, "psp")
+        self.assertTrue(os.path.isfile(os.path.join(dest, "config-title.txt")))

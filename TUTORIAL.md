@@ -53,9 +53,15 @@ junto al .exe y desde entonces se usa solo.
 > otro clásico como origen del emulador (en PS2 los más compatibles son *Jak and Daxter*,
 > *Rogue Galaxy* y *Kinetica*) o copia a mano una carpeta de emulador que ya sepas que funciona.
 
-**A mano (alternativa):** si ya tienes la carpeta de un clásico (vuelcos de un *dumper* o un
-.pkg extraído con `PkgTool.Core pkg_extract --passcode 00000000000000000000000000000000 juego.pkg
-carpeta`), cópiala en `emuladores\ps2\` (o `ps1\` / `psp\`) con el botón **Abrir carpeta**.
+**Si ya tienes el emulador en un archivo:** usa el botón **Importar…** de la pestaña y elige:
+- el **.exe de otra herramienta que lo traiga dentro**, por ejemplo **PSP-FPKG.exe** (trae el
+  emulador de PSP): la app lo saca de ahí sin ejecutarlo;
+- el **.pkg** de un clásico (la app lo extrae);
+- un **.zip** o **.7z** con la carpeta del emulador.
+
+La app detecta de qué consola es, descarta el juego que traiga y lo guarda en `emuladores\`.
+También puedes copiar a mano una carpeta de emulador (la que tiene `eboot.bin`) con
+**Abrir carpeta**.
 
 ---
 
@@ -138,7 +144,7 @@ Cuando termina, el juego aparece en el menú de la PS4 con su icono: ábrelo com
 | --- | --- |
 | **Archivo del juego** | `.iso`. Si tienes `.cso`, conviértelo antes a `.iso` (por ejemplo con UMDGen o maxcso). |
 | **Cómo obtenerlo** | Desde una PSP con firmware personalizado: *Copiar UMD a ISO* y pásalo por USB. |
-| **Necesita** | El emulador de PSP: **Traer de mi PS4** (paso 2). |
+| **Necesita** | El emulador de PSP: **Traer de mi PS4**, o **Importar…** con PSP-FPKG.exe (paso 2). |
 | **Recomendado** | Perfil **Máxima** (antialiasing SSAA 4x). |
 | **Menú en el juego** | El menú del emulador de PlayStation Plus: estados guardados y rebobinar. |
 
@@ -214,7 +220,7 @@ Las tarjetas de memoria y estados se guardan en `/data/DolphinPS4` de la PS4.
 
 | Problema | Solución |
 | --- | --- |
-| La app dice **Falta el emulador** (PS1/PS2/PSP) | Usa **Traer de mi PS4** con un clásico de esa consola abierto en la PS4 (paso 2). |
+| La app dice **Falta el emulador** (PS1/PS2/PSP) | Usa **Traer de mi PS4** con un clásico de esa consola abierto en la PS4, o **Importar…** si lo tienes en un archivo (paso 2). |
 | **Traer de mi PS4** no conecta | FTP de GoldHEN activado (puerto 2121), IP correcta, PS4 y PC en la misma red, y el clásico abierto en la PS4 (no solo instalado). |
 | **Remote Package Installer** no recibe nada | PS4 y PC en la misma red; GoldHEN activo; permite la app en el firewall de Windows; revisa la IP. |
 | La PS4 dice que **no hay espacio** | Libera espacio: la instalación necesita el tamaño del juego (y algo más mientras se instala). |

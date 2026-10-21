@@ -1,1 +1,2 @@
 pillow  # opcional: redimensiona imágenes y dibuja el título en el icono
+py7zr   # opcional: importar emuladores desde .7z o desde el .exe de otras herramientas
