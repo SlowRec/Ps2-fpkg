@@ -92,6 +92,13 @@ def decrypt_eboot(image, tool, log):
             raise BuildError(f"No se pudo descifrar el EBOOT.BIN: {(res.stderr or res.stdout).strip()}")
         with open(dst, "rb") as f:
             plain = f.read()
+    if plain[:4] == b"\x7fELF":
+        log("EBOOT.BIN descifrado correctamente (ELF).")
+    elif plain[:2] == b"\x1f\x8b":
+        log("EBOOT.BIN descifrado; viene comprimido (gzip), como en el UMD original.")
+    else:
+        raise BuildError(f"El EBOOT.BIN descifrado no es válido (empieza por {plain[:4].hex()}): "
+                         f"{os.path.basename(tool)} no pudo descifrar este juego.")
     if len(plain) > size:
         raise BuildError("El EBOOT descifrado no cabe en su lugar dentro de la ISO.")
     # Como PSP-FPKG: el ELF descifrado se escribe sobre el principio del EBOOT y el tamaño del

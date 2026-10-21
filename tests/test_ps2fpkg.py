@@ -208,7 +208,8 @@ class FormatTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             make_emu_base(d)
             with open(os.path.join(d, emu.CONFIG_NAME), "a") as f:
-                f.write('#--path-toolingscript="/app0/patches"\n#--path-patches="/x"\n--gs-upscale=gpu\n')
+                f.write('#--path-toolingscript="/app0/patches"\n#--path-patches="/x"\n--gs-upscale=gpu\n'
+                        '--ee-cycle-scalar=1.5\n--rom="PS20220WD20050620.crack"\n')
             text = emu.make_config(d, "SLUS-20946", 2,
                                    ["--gs-uprender=2x2", "--host-audio=1", '--path-patches="/app0/patches"',
                                     "--gs-uprender=none"], drop={"--gs-upscale"})
@@ -220,7 +221,10 @@ class FormatTests(unittest.TestCase):
         self.assertIn('--path-patches="/app0/patches"', lines)  # reemplaza la línea comentada
         self.assertIn('--path-toolingscript="/app0/patches"', lines)  # descomentada con 2 discos
         self.assertFalse(any(ln.startswith("--gs-upscale") for ln in lines))  # la manda la config del juego
-        self.assertEqual(lines[-1], "--host-audio=1")
+        self.assertIn("--host-audio=1", lines)
+        self.assertIn('--rom="PS20220WD20050620.crack"', lines)
+        self.assertIn('--path-vmc="/tmp/vmc"', lines)
+        self.assertNotIn("--ee-cycle-scalar=1.5", lines)  # ajuste del juego de la base: no pasa
 
     def test_pnach_translation(self):
         meta, sections = pnach.parse(PNACH)
@@ -231,7 +235,7 @@ class FormatTests(unittest.TestCase):
         self.assertTrue(pnach.find_section(sections, pnach.FPS60).unsupported)  # condicional E0
         self.assertIsNone(pnach.find_section(sections, pnach.PROGRESSIVE))
         lua = pnach.to_lua([ws, pnach.find_section(sections, pnach.NO_INTERLACE)], widescreen=True)
-        self.assertIn("apiRequest(1.2)", lua)
+        self.assertIn("apiRequest(0.1)", lua)
         self.assertIn("ps2fpkgEE.WriteMem32(0x002AF750, 0x3F1F3B64)", lua)
         self.assertIn("ps2fpkgEE.WriteMem8(0x0012ABCD, 0xE0)", lua)
         self.assertIn("ps2fpkgEE.WriteMem32(0x00400000, (ps2fpkgEE.ReadMem32(0x00400000) & 0x0000FFFF) | 0x12340000)", lua)
@@ -343,8 +347,9 @@ class BuildTests(unittest.TestCase):
 
     def test_original_profile_keeps_base(self):
         _files, config = self._project(quality="original")
-        self.assertIn("--gs-uprender=none", config)
-        self.assertFalse(any(ln.startswith("--host-display-mode") for ln in config))
+        self.assertIn("--gs-uprender=none", config)            # el de la base
+        self.assertIn("--host-display-mode=normal", config)    # configuración limpia de PS2-FPKG
+        self.assertIn('--rom="PS20220WD20050620.crack"', config)
 
     @unittest.skipUnless(os.environ.get("PS2FPKG_PKGTOOL"), "define PS2FPKG_PKGTOOL para la prueba con PkgTool")
     def test_real_pkg(self):

@@ -206,11 +206,47 @@ def merge_args(lines, overrides=(), drop=(), uncomment=(), extra=()):
     return "\n".join(out) + "\n"
 
 
+# config-emu-ps4.txt limpia, como la escribe PS2-FPKG: la de la base es la del juego del que
+# salió el emulador (Jak and Daxter, Rogue Galaxy…) y trae ajustes de ese juego que dejan otros
+# juegos en pantalla negra. De la base solo se toman estas opciones genéricas.
+CLEAN_CONFIG = (
+    ("--path-vmc", '"/tmp/vmc"'),
+    ("--config-local-lua", '""'),
+    ("--ps2-title-id", None),
+    ("--max-disc-num", None),
+    ("--gs-uprender", "none"),
+    ("--gs-upscale", "none"),
+    ("--host-audio", "1"),
+    ("--rom", None),
+    ("--verbose-cdvd-reads", "0"),
+    ("--host-display-mode", "normal"),
+)
+FROM_BASE = {"--path-vmc", "--gs-uprender", "--gs-upscale", "--host-display-mode", "--rom"}
+
+
 def make_config(base, serial, disc_count, overrides=(), drop=()):
-    """Copia config-emu-ps4.txt de la base fijando el serial y el número de discos, y aplica
-    `overrides` (líneas '--clave=valor', la última gana). Las claves de `drop` se quitan
-    (salvo que estén en overrides): sirve para que la configuración oficial del juego mande.
-    Con varios discos activa el script de cambio de disco de la base."""
-    return merge_args(read_lines(os.path.join(base, CONFIG_NAME)),
-                      [f"--ps2-title-id={serial}", f"--max-disc-num={disc_count}", *overrides], drop,
-                      uncomment={"--path-toolingscript"} if disc_count > 1 else ())
+    """config-emu-ps4.txt limpia (ver CLEAN_CONFIG) con el serial, el número de discos y
+    `overrides` (líneas '--clave=valor', la última gana). Las claves de `drop` se quitan (salvo
+    que estén en overrides): sirve para que la configuración oficial del juego mande. Con varios
+    discos se activa el script de cambio de disco de la base, si lo tiene."""
+    from_base, tooling = {}, None
+    for ln in read_lines(os.path.join(base, CONFIG_NAME)):
+        key = arg_key(ln)
+        text = ln.strip().lstrip("#").strip()
+        if key in FROM_BASE and not ln.strip().startswith("#"):
+            from_base[key] = text
+        elif key == "--path-toolingscript":
+            tooling = text
+    if "--rom" not in from_base:
+        bios = sorted(n for n in os.listdir(base) if n.lower().endswith(".crack"))
+        from_base["--rom"] = f'--rom="{bios[0] if bios else "PS20220WD20050620.crack"}"'
+    values = {"--ps2-title-id": serial, "--max-disc-num": str(disc_count)}
+    lines = []
+    for key, default in CLEAN_CONFIG:
+        if key in from_base:
+            lines.append(from_base[key])
+        else:
+            lines.append(f"{key}={values.get(key, default)}")
+    if disc_count > 1 and tooling:
+        lines.append(tooling)
+    return merge_args(lines, list(overrides), drop)

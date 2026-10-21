@@ -120,8 +120,9 @@ def to_lua(sections, title="", source="", widescreen=False):
         f"-- Juego: {title}" if title else None,
         f"-- Origen: {source}" if source else None,
         "-- Secciones: " + ", ".join(s.name for s in sections),
+        "-- API 0.1 (la de todas las bases); las funciones más nuevas solo se usan si existen.",
         "",
-        "apiRequest(1.2)",
+        "apiRequest(0.1)",
         "",
         "local ps2fpkgEE  = getEEObject()",
         "local ps2fpkgEmu = getEmuObject()",
@@ -129,11 +130,18 @@ def to_lua(sections, title="", source="", widescreen=False):
         "local ps2fpkgOnce = function()",
         *once,
         "end",
-        "ps2fpkgEmu.AddEntryPointHook(ps2fpkgOnce)",
+        "if ps2fpkgEmu.AddEntryPointHook then",
+        "\tps2fpkgEmu.AddEntryPointHook(ps2fpkgOnce)",
+        "else",
+        "\tlocal ps2fpkgDone = false",
+        "\tps2fpkgEmu.AddVsyncHook(function()",
+        "\t\tif not ps2fpkgDone then ps2fpkgDone = true; ps2fpkgOnce() end",
+        "\tend)",
+        "end",
     ]
     if every:
         out += ["", "local ps2fpkgEveryFrame = function()", *every, "end",
                 "ps2fpkgEmu.AddVsyncHook(ps2fpkgEveryFrame)"]
     if widescreen:
-        out += ["", "ps2fpkgEmu.SetDisplayAspectWide()"]
+        out += ["", "if ps2fpkgEmu.SetDisplayAspectWide then ps2fpkgEmu.SetDisplayAspectWide() end"]
     return "\n".join(line for line in out if line is not None) + "\n"
