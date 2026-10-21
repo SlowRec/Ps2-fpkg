@@ -160,8 +160,10 @@ Sus pestañas en la app lo explican; si aparece un emulador que funcione, se pod
 
    Si ya tienes el emulador en un archivo, **Importar…** (o `python -m ps2fpkg importar-emulador
    ARCHIVO`) lo instala desde una carpeta, el **.pkg** de un clásico (lo extrae con PkgTool), un
-   **.zip** o **.7z**, o el **.exe de otra herramienta que lo lleve dentro**, como PSP-FPKG (la base
-   de PSP va incrustada como .7z: la app la busca en el archivo sin ejecutarlo). Detecta la
+   **.zip** o **.7z**, o una **herramienta que lo lleve dentro** (PSP-FPKG, PSX-FPKG o PS2-FPKG, su
+   .exe o el .7z/.zip en que se descarga): las bases van incrustadas como .7z en el .exe y la app
+   las busca sin ejecutar nada; si hay varias consolas las instala todas, y en PS2 prefiere la base
+   *Jak v2*. Los .7z con el filtro BCJ2 se abren con 7-Zip si está instalado. Detecta la
    consola, descarta los discos del juego y firma como fSELF los ejecutables que vengan descifrados.
 5. **Internet** (opcional, PS2): para descargar los parches de PCSX2 y la configuración oficial.
    Se guardan en `~/.ps2fpkg/cache`. Sin internet: `--parches CARPETA` con archivos `.pnach`.
@@ -229,7 +231,9 @@ debe estar en **exFAT** (FAT32 no admite archivos tan grandes); la app avisa cua
 
 ## Cómo funciona cada consola
 
-- **PS2:** discos en `image/discNN.iso`, opciones en `config-emu-ps4.txt`, parches de PCSX2 en
+- **PS2:** discos en `image/discNN.iso` (los CD en formato BIN de 2352 bytes/sector se copian tal
+  cual con el sector LIMG al final, tipo 2 y 0x930 bytes/sector, como PS2 Classics GUI y PS2-FPKG;
+  convertirlos a ISO de 2048 rompe los juegos que usan tablas de sectores), opciones en `config-emu-ps4.txt`, parches de PCSX2 en
   `feature_data/<SERIAL>_features.lua`, configuración oficial en `patches/<SERIAL>_cli.conf`.
 - **PS1:** discos en `data/discN.bin` (+ `.cue` y `.toc`), opciones en `config-title.txt`.
   Se descartan el disco y los scripts del juego original de la base.

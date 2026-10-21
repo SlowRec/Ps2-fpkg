@@ -137,8 +137,9 @@ def build(opts, log=print, progress=None):
             target = f"image/disc{n:02d}.iso"
             if disc.is_raw:
                 dst = pkg.path(target)
-                log(f"Disco {n}: imagen BIN de {disc.sector_size} bytes/sector, convirtiendo a ISO...")
-                disc.convert_to_iso(dst, progress)
+                log(f"Disco {n}: CD en formato BIN ({disc.sector_size} bytes/sector): se copia tal cual con "
+                    "el sector LIMG para el emulador...")
+                disc.copy_with_limg(dst, progress)
                 pkg.add(target, dst)
             else:
                 pkg.add(target, disc.path)

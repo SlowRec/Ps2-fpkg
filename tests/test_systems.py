@@ -688,7 +688,7 @@ class ImporterTests(Base):
         self.assertEqual(importer.import_base(z, dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)[0], "ps1")
         bad = os.path.join(self.dir, "nada.exe")
         write(bad, b"MZ" + bytes(100))
-        with self.assertRaisesRegex(importer.EmuImportError, "ningún emulador"):
+        with self.assertRaisesRegex(importer.EmuImportError, "No se encontró un emulador"):
             importer.import_base(bad, dest_root=self.dir, log=lambda m: None)
 
     @unittest.skipUnless(importlib.util.find_spec("py7zr"), "instala py7zr")
@@ -704,3 +704,30 @@ class ImporterTests(Base):
         system, dest = importer.import_base(exe, dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)
         self.assertEqual(system, "psp")
         self.assertTrue(os.path.isfile(os.path.join(dest, "config-title.txt")))
+
+
+class ImporterToolTests(Base):
+    make_base = ImporterTests.make_base
+
+    def test_tool_zip_with_exe_and_several_bases(self):
+        bases = os.path.join(self.dir, "bases")
+        self.make_base(os.path.join(bases, "emus", "Rogue v1"), "ps2")
+        self.make_base(os.path.join(bases, "emus", "Jak v2"), "ps2")
+        write(os.path.join(bases, "emus", "Jak v2", "marca.txt"), "jak")
+        self.make_base(os.path.join(bases, "ps1hd"), "ps1")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for dirpath, _d, files in os.walk(bases):
+                for n in files:
+                    full = os.path.join(dirpath, n)
+                    z.write(full, os.path.relpath(full, bases))
+        tool = io.BytesIO()
+        with zipfile.ZipFile(tool, "w") as z:
+            z.writestr("PS2-FPKG/PS2-FPKG.exe", b"MZ" + bytes(3000) + buf.getvalue() + bytes(100))
+            z.writestr("PS2-FPKG/readme.txt", "hola")
+        archive = os.path.join(self.dir, "PS2-FPKG_v0.7.zip")
+        write(archive, tool.getvalue())
+        installed = importer.import_all(archive, dest_root=os.path.join(self.dir, "emus"), log=lambda m: None)
+        self.assertEqual(set(installed), {"ps1", "ps2"})
+        self.assertTrue(os.path.isfile(os.path.join(installed["ps2"], "marca.txt")))   # Jak v2 antes que Rogue
+        self.assertFalse(os.path.exists(os.path.join(installed["ps2"], "image")))

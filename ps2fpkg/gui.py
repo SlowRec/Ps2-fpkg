@@ -343,13 +343,14 @@ class SystemTab(ttk.Frame):
 
         def work():
             try:
-                system, dest = importer.import_base(path, self.spec.key, log=self.app.log_threadsafe)
+                installed = importer.import_all(path, log=self.app.log_threadsafe)
                 for tab in self.app.tabs:
-                    if tab.spec.key == system:
+                    if tab.spec.key in installed:
                         tab.vars["emu_dir"].set("")
                         self.app.events.put(("call", tab.refresh_emu))
                 self.app.events.put(("call", self.app.remember))
-                self.app.events.put(("done", f"Emulador de {emu.SYSTEM_NAMES[system]} listo:\n{dest}"))
+                listed = "\n".join(f"{emu.SYSTEM_NAMES[k]}: {v}" for k, v in installed.items())
+                self.app.events.put(("done", f"Emulador listo:\n{listed}"))
             except Exception as e:  # noqa: BLE001 — se muestra al usuario
                 self.app.events.put(("error", str(e)))
 

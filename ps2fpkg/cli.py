@@ -242,7 +242,10 @@ def main(argv=None):
     try:
         if argv and argv[0] == "importar-emulador":
             a = parse_import(argv[1:])
-            importer.import_base(a.archivo, a.consola)
+            if a.consola:
+                importer.import_base(a.archivo, a.consola)
+            else:
+                importer.import_all(a.archivo)
             return 0
         if argv and argv[0] == "traer-emulador":
             a = parse_fetch(argv[1:])

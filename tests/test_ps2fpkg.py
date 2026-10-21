@@ -136,7 +136,7 @@ class IsoTests(unittest.TestCase):
         make_iso(path, {"SYSTEM.CNF": SYSTEM_CNF, "SLUS_209.46": b"elf"})
         self.assertEqual(builder.detect_serial(path), "SLUS-20946")
 
-    def test_raw_bin_is_converted(self):
+    def test_raw_bin_gets_limg_sector(self):
         for mode in (1, 2):
             raw = os.path.join(self.dir, f"game{mode}.bin")
             make_iso(raw, {"SYSTEM.CNF": SYSTEM_CNF}, raw_mode=mode)
@@ -144,10 +144,15 @@ class IsoTests(unittest.TestCase):
                 self.assertTrue(disc.is_raw)
                 self.assertEqual(iso.read_serial(disc), "SLUS-20946")
                 out = os.path.join(self.dir, f"out{mode}.iso")
-                disc.convert_to_iso(out)
-            with iso.DiscImage(out) as disc:
-                self.assertFalse(disc.is_raw)
-                self.assertEqual(iso.read_serial(disc), "SLUS-20946")
+                disc.copy_with_limg(out)
+            with open(raw, "rb") as f:
+                original = f.read()
+            with open(out, "rb") as f:
+                copied = f.read()
+            self.assertEqual(copied[:len(original)], original)            # el CD tal cual
+            limg = copied[len(original):]
+            self.assertEqual(len(limg), 0x4000)
+            self.assertEqual(limg[:16], b"LIMG" + struct.pack(">III", 2, len(original) // 2352, 0x930))
 
     def test_boot_elf_in_subdirectory_and_crc(self):
         path = os.path.join(self.dir, "game.iso")
@@ -279,7 +284,10 @@ class BuildTests(unittest.TestCase):
         root = ET.parse(gp4_path).getroot()
         files = {f.get("targ_path"): f.get("orig_path") for f in root.iter("file")}
         self.assertEqual(files["image/disc01.iso"], os.path.abspath(self.iso1))
-        self.assertTrue(files["image/disc02.iso"].endswith("disc02.iso"))  # BIN convertido
+        self.assertTrue(files["image/disc02.iso"].endswith("disc02.iso"))  # BIN copiado con su sector LIMG
+        with open(files["image/disc02.iso"], "rb") as f:
+            f.seek(-0x4000, os.SEEK_END)
+            self.assertEqual(f.read(8), b"LIMG\0\0\0\2")
         for excluded in ("sce_sys/keystone", "sce_sys/trophy/trophy00.trp"):
             self.assertNotIn(excluded, files)
         for included in ("eboot.bin", "lua_include/common.lua", "sce_sys/about/right.sprx",

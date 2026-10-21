@@ -54,8 +54,10 @@ junto al .exe y desde entonces se usa solo.
 > *Rogue Galaxy* y *Kinetica*) o copia a mano una carpeta de emulador que ya sepas que funciona.
 
 **Si ya tienes el emulador en un archivo:** usa el botón **Importar…** de la pestaña y elige:
-- el **.exe de otra herramienta que lo traiga dentro**, por ejemplo **PSP-FPKG.exe** (trae el
-  emulador de PSP): la app lo saca de ahí sin ejecutarlo;
+- una **herramienta que lo traiga dentro**: **PSP-FPKG** (PSP), **PSX-FPKG** (PS1) o **PS2-FPKG**
+  (PS2, se usa la base *Jak v2*, la más compatible). Puedes elegir su .exe o directamente el
+  .7z/.zip en que se descarga; la app saca de ahí el emulador sin ejecutar nada. Si el .7z no se
+  abre, instala 7-Zip o descomprímelo primero y elige el .exe de dentro;
 - el **.pkg** de un clásico (la app lo extrae);
 - un **.zip** o **.7z** con la carpeta del emulador.
 
@@ -114,7 +116,7 @@ Cuando termina, el juego aparece en el menú de la PS4 con su icono: ábrelo com
 
 | | |
 | --- | --- |
-| **Archivo del juego** | `.iso` (lo mejor) o `.bin` de 2352 bytes/sector. Juegos de varios discos: agrégalos todos, en orden. |
+| **Archivo del juego** | `.iso` (juegos en DVD) o `.bin` (juegos en CD: la app lo deja tal cual y le añade el sector LIMG que necesita el emulador). Juegos de varios discos: agrégalos todos, en orden. |
 | **Cómo obtenerlo** | Copia tu disco a `.iso` con ImgBurn (*Create image file from disc*) en la PC. |
 | **Necesita** | El emulador de PS2: **Traer de mi PS4** (paso 2). |
 | **Recomendado** | Perfil **Máxima**, *Pantalla 16:9*, *Sin entrelazado* y *Config. oficial* (ya vienen marcados). |

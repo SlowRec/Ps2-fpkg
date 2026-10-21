@@ -111,16 +111,23 @@ class DiscImage:
             return None
         return self.read_extent(*entry)
 
-    def convert_to_iso(self, dst, progress=None):
-        """Escribe una copia en formato ISO de 2048 bytes/sector (para imágenes BIN)."""
-        total = self.sector_count
+    def copy_with_limg(self, dst, progress=None):
+        """Copia la imagen BIN en bruto (2352 bytes/sector) y le añade el sector LIMG al final, como
+        PS2 Classics GUI y PS2-FPKG: el emulador de PS2 lee entonces el CD tal cual, sin convertirlo
+        a 2048 bytes/sector (lo que rompe los juegos que usan tablas de sectores)."""
+        total = self.size
+        done = 0
+        self._f.seek(0)
         with open(dst, "wb") as out:
-            for lba in range(total):
-                out.write(self.read_sector(lba))
-                if progress and lba % 4096 == 0:
-                    progress(lba, total)
-        if progress:
-            progress(total, total)
+            while True:
+                chunk = self._f.read(1 << 22)
+                if not chunk:
+                    break
+                out.write(chunk)
+                done += len(chunk)
+                if progress:
+                    progress(done, total)
+            out.write(limg_sector(self.size // RAW_SECTOR, RAW_SECTOR))
 
     def close(self):
         self._f.close()
@@ -134,6 +141,16 @@ class DiscImage:
 
 SERIAL_RE = re.compile(r"BOOT2\s*=\s*cdrom0:\\?(?:[^\r\n;]*\\)?([A-Z]{4})[_-](\d{3})\.?(\d{2})", re.IGNORECASE)
 BOOT_PATH_RE = re.compile(r"BOOT2\s*=\s*cdrom0:\\?([^\r\n;]+)", re.IGNORECASE)
+
+
+LIMG_SIZE = 0x4000
+
+
+def limg_sector(sectors, sector_size=RAW_SECTOR):
+    """Sector LIMG (0x4000 bytes al final de la imagen): tipo 2 = CD (0x930 bytes/sector), 1 = DVD."""
+    kind = 2 if sector_size == RAW_SECTOR else 1
+    head = b"LIMG" + struct.pack(">III", kind, sectors, sector_size)
+    return head + bytes(LIMG_SIZE - len(head))
 
 
 def parse_serial(system_cnf):
