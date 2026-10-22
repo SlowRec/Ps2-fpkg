@@ -11,8 +11,8 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ps2fpkg import (covers, cue, dreamcast, emu, fself, gamecube, images, importer, iso, pkgbuild,  # noqa: E402
-                     ps1, ps4ftp, psp, retro, sfo)
+from ps2fpkg import (covers, cue, dreamcast, emu, fself, gamecube, images, importer, iso, m33,  # noqa: E402
+                     pkgbuild, ps1, ps4ftp, psp, retro, sfo)
 from test_ps2fpkg import make_iso  # noqa: E402
 
 REAL_PKGTOOL = os.environ.get("PS2FPKG_PKGTOOL")
@@ -575,6 +575,21 @@ class FakeGoldhenFtp:
                 dconn.close()
                 data_sock.close()
                 f.write(b"226 ok\r\n")
+            elif cmd == "MKD":
+                f.write(b"257 ok\r\n")
+            elif cmd == "STOR":
+                f.write(b"150 ok\r\n")
+                dconn, _ = data_sock.accept()
+                chunks = []
+                while True:
+                    chunk = dconn.recv(1 << 16)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                dconn.close()
+                data_sock.close()
+                self.files[arg] = b"".join(chunks)
+                f.write(b"226 ok\r\n")
             elif cmd == "QUIT":
                 f.write(b"221 bye\r\n")
                 break
@@ -736,3 +751,24 @@ class ImporterToolTests(Base):
         self.assertEqual(set(installed), {"ps1", "ps2"})
         self.assertTrue(os.path.isfile(os.path.join(installed["ps2"], "marca.txt")))   # Jak v2 antes que Rogue
         self.assertFalse(os.path.exists(os.path.join(installed["ps2"], "image")))
+
+
+class M33Tests(Base):
+    def test_send_games(self):
+        server = FakeGoldhenFtp({})
+        self.addCleanup(server.close)
+        game = os.path.join(self.dir, "Patapon (USA).iso")
+        data = os.urandom(3 * 1024 * 1024 + 17)
+        write(game, data)
+        seen = []
+        sent = m33.send_games("127.0.0.1", [game], ["Patapon: edición"], log=lambda m: None,
+                              progress=lambda d, t: seen.append((d, t)), port=server.port)
+        self.assertEqual(sent, ["/data/March33/games/Patapon_ edición.iso"])
+        self.assertEqual(server.files["/data/March33/games/Patapon_ edición.iso"], data)
+        self.assertEqual(seen[-1], (len(data), len(data)))
+        with self.assertRaisesRegex(m33.M33Error, "acepta"):
+            m33.send_games("127.0.0.1", [os.path.join(self.dir, "x.pbp")], port=server.port)
+
+    def test_pinned_package(self):
+        self.assertTrue(m33.PKG_URL.endswith(f"/{m33.VERSION}/M33-v{m33.VERSION}.pkg"))
+        self.assertRegex(m33.PKG_SHA256, r"^[0-9a-f]{64}$")

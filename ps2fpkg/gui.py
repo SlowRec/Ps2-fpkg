@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import subprocess
 import sys
 
-from . import __version__, builder, covers, dreamcast, emu, gamecube, images, importer, install, ps1, ps4ftp, psp, retro
+from . import __version__, builder, covers, dreamcast, emu, gamecube, images, importer, install, m33, ps1, ps4ftp, psp, retro
 
 SETTINGS = os.path.join(os.path.expanduser("~"), ".ps2fpkg.json")
 SHARED = ("pkgtool", "output_dir", "ps4_ip")
@@ -254,6 +254,17 @@ class SystemTab(ttk.Frame):
         row += 1
         if s.note:
             ttk.Label(self, text=s.note, foreground="#555", wraplength=820, justify="left").grid(row=row, column=0, columnspan=5, sticky="w", pady=(6, 0))
+        if s.key == "psp":
+            alt = ttk.LabelFrame(self, text="Alternativa sin el emulador de Sony: M33 (PPSSPP para PS4)", padding=8)
+            alt.grid(row=row + 1, column=0, columnspan=5, sticky="ew", pady=(8, 0))
+            ttk.Label(alt, wraplength=800, justify="left", text=(
+                "M33 se instala una vez como app en la PS4 y los juegos se le envían por red: aparecen en su "
+                "lista (no como iconos sueltos). Necesita la IP de la PS4 y el FTP de GoldHEN activado.")
+                      ).grid(row=0, column=0, columnspan=3, sticky="w")
+            ttk.Button(alt, text="1. Instalar M33 en la PS4", command=self._install_m33).grid(
+                row=1, column=0, sticky="w", pady=(6, 0))
+            ttk.Button(alt, text="2. Enviar este juego a M33", command=self._send_m33).grid(
+                row=1, column=1, sticky="w", padx=(8, 0), pady=(6, 0))
 
     # --- Selección de archivos -----------------------------------------
     def _pick_dir(self, key):
@@ -329,6 +340,57 @@ class SystemTab(ttk.Frame):
                                              "Ya puedes cerrar el juego en la PS4."))
             except Exception as e:  # noqa: BLE001 — se muestra al usuario
                 self.app.events.put(("error", str(e)))
+
+        self.app._run_in_background(work)
+
+    def _ps4_ip(self):
+        ip = self.app.vars["ps4_ip"].get().strip() or (simpledialog.askstring(
+            "IP de la PS4", "IP de la PS4 (Ajustes → Red → Ver estado de la conexión):") or "").strip()
+        if ip:
+            self.app.vars["ps4_ip"].set(ip)
+            self.app.remember()
+        return ip
+
+    def _install_m33(self):
+        """Descarga M33 y lo manda a Remote Package Installer (m33.py)."""
+        if not messagebox.askokcancel("Instalar M33", "Abre Remote Package Installer en la PS4 (con GoldHEN) "
+                                      "y pulsa Aceptar. La app descargará M33 y lo enviará a la consola."):
+            return
+        ip = self._ps4_ip()
+        if not ip:
+            return
+
+        def work():
+            try:
+                pkg = m33.download_pkg(log=self.app.log_threadsafe)
+            except Exception as e:  # noqa: BLE001 — se muestra al usuario
+                self.app.events.put(("error", f"No se pudo descargar M33: {e}"))
+                return
+            self.app._send(pkg, ip)
+
+        self.app._run_in_background(work)
+
+    def _send_m33(self):
+        """Copia el juego elegido a /data/March33/games de la PS4 por FTP."""
+        files = self.files()
+        if not files:
+            messagebox.showinfo("M33", "Elige el juego primero.")
+            return
+        ip = self._ps4_ip()
+        if not ip:
+            return
+        title = self.vars["title"].get().strip()
+
+        def progress(done, total):
+            self.app.events.put(("progress", done * 100 // max(1, total)))
+
+        def work():
+            try:
+                m33.send_games(ip, files[:1], [title], log=self.app.log_threadsafe, progress=progress)
+                self.app.events.put(("done", "Juego enviado. Abre M33 en la PS4: aparece en su lista de juegos."))
+            except Exception as e:  # noqa: BLE001 — se muestra al usuario
+                self.app.events.put(("error", f"{e}\nRevisa la IP y que el FTP de GoldHEN esté activado "
+                                              "(y abre M33 una vez antes)."))
 
         self.app._run_in_background(work)
 

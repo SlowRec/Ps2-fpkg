@@ -1,3 +1,3 @@
 """PS2 ISO -> fPKG de PS4 (PS2 Classics)."""
 
-__version__ = "3.10.0"
+__version__ = "3.11.0"

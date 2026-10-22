@@ -12,13 +12,14 @@
     python -m ps2fpkg instalar JUEGO.pkg --ps4 IP              instalar por red con GoldHEN
     python -m ps2fpkg traer-emulador ps2 --ps4 IP              copiar el emulador de un clásico abierto en la PS4
     python -m ps2fpkg importar-emulador ARCHIVO                instalar el emulador de un .exe, .pkg, .zip o .7z
+    python -m ps2fpkg m33 --ps4 IP [--instalar] [JUEGO.iso…]   PSP con M33 (PPSSPP): instalarlo y enviarle juegos
 """
 
 import argparse
 import sys
 import time
 
-from . import builder, cue, dreamcast, emu, gamecube, importer, install, iso, ps1, ps4ftp, psp, retro
+from . import builder, cue, dreamcast, emu, gamecube, importer, install, iso, m33, ps1, ps4ftp, psp, retro
 
 SYSTEM_COMMANDS = ("ps2", "ps1", "psp", "nes", "snes", "gba", "genesis", "dc", "gc")
 
@@ -216,6 +217,19 @@ def parse_import(argv):
     return p.parse_args(argv)
 
 
+def parse_m33(argv):
+    p = argparse.ArgumentParser(
+        prog="ps2fpkg m33",
+        description="PSP con M33 (PPSSPP para PS4, sin nada de Sony): --instalar lo descarga y lo envía a "
+                    "Remote Package Installer; los juegos se copian por el FTP de GoldHEN a /data/March33/games, "
+                    "donde M33 los muestra en su lista.",
+    )
+    p.add_argument("juegos", nargs="*", help="juegos de PSP (.iso, .cso, .chd)")
+    p.add_argument("--ps4", required=True, help="IP de la PS4")
+    p.add_argument("--instalar", action="store_true", help="instalar M33 en la PS4 primero")
+    return p.parse_args(argv)
+
+
 def _progress(done, total):
     print(f"\r  {done * 100 // max(1, total)}%", end="" if done < total else "\n", flush=True)
 
@@ -240,6 +254,13 @@ def run_install(pkgs, ps4="", port=8000, host_ip=""):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     try:
+        if argv and argv[0] == "m33":
+            a = parse_m33(argv[1:])
+            if a.juegos:
+                m33.send_games(a.ps4, a.juegos, progress=_progress)
+            if a.instalar:
+                run_install([m33.download_pkg()], a.ps4)
+            return 0
         if argv and argv[0] == "importar-emulador":
             a = parse_import(argv[1:])
             if a.consola:
@@ -279,7 +300,7 @@ def main(argv=None):
         if a.instalar_en and not a.gp4_only:
             run_install([pkg], a.instalar_en)
     except (builder.BuildError, emu.EmuError, iso.DiscError, cue.CueError, ps4ftp.Ps4FtpError,
-            importer.EmuImportError, OSError, ValueError, RuntimeError) as e:
+            importer.EmuImportError, m33.M33Error, OSError, ValueError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     return 0

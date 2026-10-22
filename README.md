@@ -11,6 +11,7 @@ con **GoldHEN** (por USB o directamente por la red).
 | PS2 | oficial de Sony (PS2 Classics) | `.iso` o `.bin` | un PS2 Classic instalado en tu PS4: la app trae el emulador |
 | PS1 | oficial de Sony (PS1HD, PlayStation Plus) | `.cue` + `.bin` | un clásico de PS1 instalado en tu PS4: la app trae el emulador |
 | PSP | oficial de Sony (PSPHD, PlayStation Plus) | `.iso` | un clásico de PSP instalado en tu PS4: la app trae el emulador |
+| PSP (alternativa) | [M33](https://github.com/iHaiDeeZ/M33) (PPSSPP) — la app lo instala | `.iso`, `.cso`, `.chd` | nada: los juegos se envían por red a la app M33 (no un PKG por juego) |
 | NES | pNES (Nestopia) — **incluido** | `.nes`, `.fds`, `.zip` | nada más |
 | SNES | pSNES (Snes9x) — **incluido** | `.sfc`, `.smc`, `.zip` | nada más |
 | GBA | pGBA (mGBA) — **incluido** | `.gba`, `.gb`, `.gbc`, `.zip` | nada más (también Game Boy y Game Boy Color) |
@@ -275,6 +276,7 @@ SNES, Dreamcast y GameCube, los verifican, los extraen y comprueban su contenido
 - [LibOrbisPkg](https://github.com/maxton/LibOrbisPkg) (LGPL-3.0) — creación de PKG; corrección de PlayGo en `tools/build_pkgtool.py`.
 - [pemu](https://github.com/Cpasjuste/pemu) (GPL-3.0) — emuladores de NES, SNES, GBA y Genesis incluidos en `emus/`; código del parche en `tools/pemu-autoboot.patch` y compilación en `tools/build_pemu.py`. El de Genesis usa [Genesis Plus GX](https://github.com/ekeeke/Genesis-Plus-GX) (licencia propia no comercial: `emus/genesis-plus-gx-LICENSE.txt`).
 - [Resonance](https://github.com/iHaiDeeZ/Resonance) (GPL-2.0), basado en [Flycast](https://github.com/flyinghead/flycast) — emulador de Dreamcast incluido en `emus/resonance.zip` (versión v01.41 publicada, sin cambios; código fuente en su repositorio).
+- [M33](https://github.com/iHaiDeeZ/M33) (GPL-2.0), basado en [PPSSPP](https://www.ppsspp.org) — PSP sin el emulador de Sony: la app descarga su .pkg publicado (v1.04, SHA-256 comprobado), lo envía a la PS4 y le copia los juegos por FTP (`ps2fpkg/m33.py`). No permite todavía abrir un juego indicado al arrancar, por eso no hay un PKG por juego.
 - [DolphinPS4](https://github.com/iHaiDeeZ/DolphinPS4) (GPL-2.0), basado en [Dolphin](https://dolphin-emu.org) — emulador de GameCube/Wii incluido en `emus/dolphin.zip` (versión v04.16 publicada, sin cambios). Ambos se preparan con `tools/build_launched_emus.py`; el lanzador propio está en `tools/dc-launcher/main.c`.
 - Carátulas de GameCube/Wii por ID en [GameTDB](https://www.gametdb.com/) (como Dolphin); se descargan, no se incluyen.
 - [pspdecrypt](https://github.com/John-K/pspdecrypt) (GPL-3.0) — descifrado del EBOOT de PSP (`tools/build_pspdecrypt.py`).

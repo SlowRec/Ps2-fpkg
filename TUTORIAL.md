@@ -151,6 +151,16 @@ Cuando termina, el juego aparece en el menú de la PS4 con su icono: ábrelo com
 | **Menú en el juego** | El menú del emulador de PlayStation Plus: estados guardados y rebobinar. |
 
 - El icono y el fondo del propio juego se usan si no eliges carátula.
+
+**Alternativa sin el emulador de Sony: M33 (PPSSPP para PS4).** Si un juego queda en negro con el
+emulador de Sony, usa M33: es PPSSPP, el mejor emulador de PSP, adaptado a PS4 (imagen a 4x con
+nitidez, estados guardados, trucos y rebobinar con L2). No hace un PKG por juego: M33 se instala
+una vez como app y los juegos se le envían por red.
+1. En la PS4: GoldHEN con el **FTP activado** y **Remote Package Installer** abierto.
+2. En la pestaña PSP pulsa **1. Instalar M33 en la PS4** (la app lo descarga y lo envía).
+   Abre M33 una vez en la PS4.
+3. Elige el juego (`.iso`, `.cso` o `.chd`) y pulsa **2. Enviar este juego a M33**.
+4. Abre M33: el juego aparece en su lista. **L3 + R3** abre su menú en el juego.
 - La app descifra el ejecutable del juego automáticamente (tu ISO original no se modifica).
 
 ### NES y SNES
